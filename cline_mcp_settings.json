@@ -10,12 +10,14 @@
       ],
       "timeout": 60,
       "type": "stdio",
-      "command": "C:/Users/kidpixel/Documents/kimi-proxy/venv/Scripts/python.exe",
+      "command": "C:\Users/kidpixel/Documents/kimi-proxy/venv/Scripts/python.exe",
       "args": [
         "C:/Users/kidpixel/Documents/kimi-proxy/scripts/mcp_bridge.py",
         "filesystem-agent"
       ],
       "env": {
+        "PATH": "C:\\Windows\\System32;C:\\Windows;C:\\Program Files\\Git\\bin;C:\\Program Files\\nodejs",
+        "MCP_BRIDGE_PATH_ENV": "C:\\Windows\\System32;C:\\Windows;C:\\Program Files\\Git\\bin;C:\\Program Files\\nodejs",
         "MCP_FILESYSTEM_ALLOWED_ROOT": "C:/Users/kidpixel/Documents/kimi-proxy",
         "MCP_BRIDGE_MONITORING_ENABLED": "1",
         "MCP_BRIDGE_MONITORING_LOG_PATH": "C:/Users/kidpixel/AppData/Local/Temp/kimi-proxy/mcp-bridge-filesystem.jsonl",
@@ -49,6 +51,8 @@
         "ripgrep-agent"
       ],
       "env": {
+        "PATH": "C:\\Windows\\System32;C:\\Windows;C:\\Program Files\\Git\\bin;C:\\Program Files\\nodejs",
+        "MCP_BRIDGE_PATH_ENV": "C:\\Windows\\System32;C:\\Windows;C:\\Program Files\\Git\\bin;C:\\Program Files\\nodejs",
         "MCP_BRIDGE_STDIO_STREAM_LIMIT": "8388608",
         "MCP_BRIDGE_MONITORING_ENABLED": "1",
         "MCP_BRIDGE_MONITORING_LOG_PATH": "C:/Users/kidpixel/AppData/Local/Temp/kimi-proxy/mcp-bridge-ripgrep.jsonl",
@@ -89,6 +93,8 @@
         "shrimp-task-manager"
       ],
       "env": {
+        "PATH": "C:\\Windows\\System32;C:\\Windows;C:\\Program Files\\Git\\bin;C:\\Program Files\\nodejs",
+        "MCP_BRIDGE_PATH_ENV": "C:\\Windows\\System32;C:\\Windows;C:\\Program Files\\Git\\bin;C:\\Program Files\\nodejs",
         "MCP_SHRIMP_TASK_MANAGER_COMMAND": "C:/Users/kidpixel/Documents/kimi-proxy/scripts/mcp_shrimp_task_manager.cmd",
         "DATA_DIR": "C:/Users/kidpixel/Documents/kimi-proxy/shrimp_data",
         "MCP_BRIDGE_MONITORING_ENABLED": "1",

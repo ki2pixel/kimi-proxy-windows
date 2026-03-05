@@ -41,6 +41,7 @@ TMP_BASE_DIR="${KIMI_PROXY_TMP_ROOT:-${OS_TMP_DIR}/kimi-proxy}"
 TMP_RUNTIME_DIR="${TMP_BASE_DIR}/mcp"
 TMP_LOG_DIR="${TMP_BASE_DIR}/logs"
 MCP_ALLOWED_ROOT_DEFAULT="${KIMI_PROXY_ALLOWED_ROOT:-${HOME}}"
+MCP_DISK_ROOTS_DEFAULT="${MCP_DISK_ROOTS:-${MCP_ALLOWED_ROOT_DEFAULT}}"
 
 COMPRESSION_SERVER_SCRIPT="${TMP_RUNTIME_DIR}/mcp_compression_server.py"
 SEQUENTIAL_THINKING_SERVER_SCRIPT="${TMP_RUNTIME_DIR}/mcp_sequential_thinking_server.py"
@@ -218,7 +219,7 @@ start_servers() {
         
         # Démarrer en arrière-plan avec nohup
         # Autorise tous les chemins sous HOME par défaut (configurable)
-        MCP_ALLOWED_ROOT="$MCP_ALLOWED_ROOT_DEFAULT" nohup python3 "$FAST_FILESYSTEM_SERVER_SCRIPT" > "$FAST_FILESYSTEM_LOG_FILE" 2>&1 &
+        MCP_DISK_ROOTS="$MCP_DISK_ROOTS_DEFAULT" MCP_ALLOWED_ROOT="$MCP_ALLOWED_ROOT_DEFAULT" nohup python3 "$FAST_FILESYSTEM_SERVER_SCRIPT" > "$FAST_FILESYSTEM_LOG_FILE" 2>&1 &
         FAST_FILESYSTEM_PID=$!
         
         # Attendre que le serveur démarre
@@ -252,7 +253,7 @@ start_servers() {
         
         # Démarrer en arrière-plan avec nohup
         # Autorise tous les chemins sous HOME par défaut (configurable)
-        MCP_ALLOWED_ROOT="$MCP_ALLOWED_ROOT_DEFAULT" nohup python3 "$JSON_QUERY_SERVER_SCRIPT" > "$JSON_QUERY_LOG_FILE" 2>&1 &
+        MCP_DISK_ROOTS="$MCP_DISK_ROOTS_DEFAULT" MCP_ALLOWED_ROOT="$MCP_ALLOWED_ROOT_DEFAULT" nohup python3 "$JSON_QUERY_SERVER_SCRIPT" > "$JSON_QUERY_LOG_FILE" 2>&1 &
         JSON_QUERY_PID=$!
         
         # Attendre que le serveur démarre
@@ -966,10 +967,24 @@ PORT = 8004
 # MCP minimal handshake support
 DEFAULT_MCP_PROTOCOL_VERSION = "2025-11-25"
 
-# Configuration racine autorisée (reçu depuis l'environnement)
-# - MCP_ALLOWED_ROOT est la nouvelle variable recommandée (root global)
-# - WORKSPACE_PATH est conservée en fallback pour compatibilité
-ALLOWED_ROOT = os.getenv("MCP_ALLOWED_ROOT") or os.getenv("WORKSPACE_PATH") or str(Path.home())
+# Configuration racines autorisées (reçu depuis l'environnement)
+# Priorité: MCP_DISK_ROOTS > MCP_ALLOWED_ROOT > WORKSPACE_PATH > Path.cwd()
+def _resolve_allowed_roots() -> List[Path]:
+    disk_roots_raw = os.getenv("MCP_DISK_ROOTS")
+    if isinstance(disk_roots_raw, str) and disk_roots_raw.strip():
+        separator = ";" if ";" in disk_roots_raw else ","
+        parsed = [item.strip() for item in disk_roots_raw.split(separator) if item.strip()]
+        if parsed:
+            return [Path(item).expanduser().resolve(strict=False) for item in parsed]
+
+    single_root = os.getenv("MCP_ALLOWED_ROOT") or os.getenv("WORKSPACE_PATH")
+    if isinstance(single_root, str) and single_root.strip():
+        return [Path(single_root).expanduser().resolve(strict=False)]
+
+    return [Path.cwd().resolve(strict=False)]
+
+
+ALLOWED_ROOTS = _resolve_allowed_roots()
 
 class FastFilesystemHandler(BaseHTTPRequestHandler):
     """Handler pour les requêtes JSON-RPC 2.0"""
@@ -987,24 +1002,23 @@ class FastFilesystemHandler(BaseHTTPRequestHandler):
         self.wfile.write(json.dumps(data).encode())
     
     def _is_path_allowed(self, path: str) -> bool:
-        """Vérifie si le chemin est sous la racine autorisée.
-
-        Sécurité:
-        - normalisation via Path.resolve(strict=False)
-        - appartenance via relative_to() (anti path traversal + symlinks)
-        """
+        """Vérifie si le chemin est sous une des racines autorisées."""
         if not path or not isinstance(path, str):
             return False
 
         try:
-            allowed_root = Path(ALLOWED_ROOT).expanduser().resolve(strict=False)
             requested = Path(path).expanduser()
             if not requested.is_absolute():
                 requested = Path.cwd() / requested
             requested_resolved = requested.resolve(strict=False)
 
-            requested_resolved.relative_to(allowed_root)
-            return True
+            for allowed_root in ALLOWED_ROOTS:
+                try:
+                    requested_resolved.relative_to(allowed_root)
+                    return True
+                except ValueError:
+                    continue
+            return False
         except (OSError, RuntimeError, ValueError):
             return False
     
@@ -1017,7 +1031,7 @@ class FastFilesystemHandler(BaseHTTPRequestHandler):
                 path = params[param]
                 if not self._is_path_allowed(path):
                     raise PermissionError(
-                        f"Accès refusé: chemin '{path}' hors de la racine autorisée '{ALLOWED_ROOT}'"
+                        f"Accès refusé: chemin '{path}' hors des racines autorisées"
                     )
         
         return params
@@ -1026,7 +1040,7 @@ class FastFilesystemHandler(BaseHTTPRequestHandler):
         for p in paths:
             if not isinstance(p, str) or not self._is_path_allowed(p):
                 raise PermissionError(
-                    f"Accès refusé: chemin '{p}' hors de la racine autorisée '{ALLOWED_ROOT}'"
+                    f"Accès refusé: chemin '{p}' hors des racines autorisées"
                 )
     
     def do_OPTIONS(self):
@@ -1441,10 +1455,24 @@ PORT = 8005
 # MCP minimal handshake support
 DEFAULT_MCP_PROTOCOL_VERSION = "2025-11-25"
 
-# Configuration racine autorisée (reçu depuis l'environnement)
-# - MCP_ALLOWED_ROOT est la nouvelle variable recommandée (root global)
-# - WORKSPACE_PATH est conservée en fallback pour compatibilité
-ALLOWED_ROOT = os.getenv("MCP_ALLOWED_ROOT") or os.getenv("WORKSPACE_PATH") or str(Path.home())
+# Configuration racines autorisées (reçu depuis l'environnement)
+# Priorité: MCP_DISK_ROOTS > MCP_ALLOWED_ROOT > WORKSPACE_PATH > Path.cwd()
+def _resolve_allowed_roots() -> List[Path]:
+    disk_roots_raw = os.getenv("MCP_DISK_ROOTS")
+    if isinstance(disk_roots_raw, str) and disk_roots_raw.strip():
+        separator = ";" if ";" in disk_roots_raw else ","
+        parsed = [item.strip() for item in disk_roots_raw.split(separator) if item.strip()]
+        if parsed:
+            return [Path(item).expanduser().resolve(strict=False) for item in parsed]
+
+    single_root = os.getenv("MCP_ALLOWED_ROOT") or os.getenv("WORKSPACE_PATH")
+    if isinstance(single_root, str) and single_root.strip():
+        return [Path(single_root).expanduser().resolve(strict=False)]
+
+    return [Path.cwd().resolve(strict=False)]
+
+
+ALLOWED_ROOTS = _resolve_allowed_roots()
 
 class JsonQueryHandler(BaseHTTPRequestHandler):
     """Handler pour les requêtes JSON-RPC 2.0"""
@@ -1462,24 +1490,23 @@ class JsonQueryHandler(BaseHTTPRequestHandler):
         self.wfile.write(json.dumps(data).encode())
     
     def _is_path_allowed(self, path: str) -> bool:
-        """Vérifie si le chemin est sous la racine autorisée.
-
-        Sécurité:
-        - normalisation via Path.resolve(strict=False)
-        - appartenance via relative_to() (anti path traversal + symlinks)
-        """
+        """Vérifie si le chemin est sous une des racines autorisées."""
         if not path or not isinstance(path, str):
             return False
 
         try:
-            allowed_root = Path(ALLOWED_ROOT).expanduser().resolve(strict=False)
             requested = Path(path).expanduser()
             if not requested.is_absolute():
                 requested = Path.cwd() / requested
             requested_resolved = requested.resolve(strict=False)
 
-            requested_resolved.relative_to(allowed_root)
-            return True
+            for allowed_root in ALLOWED_ROOTS:
+                try:
+                    requested_resolved.relative_to(allowed_root)
+                    return True
+                except ValueError:
+                    continue
+            return False
         except (OSError, RuntimeError, ValueError):
             return False
     
@@ -1492,7 +1519,7 @@ class JsonQueryHandler(BaseHTTPRequestHandler):
                 path = params[param]
                 if not self._is_path_allowed(path):
                     raise PermissionError(
-                        f"Accès refusé: chemin '{path}' hors de la racine autorisée '{ALLOWED_ROOT}'"
+                        f"Accès refusé: chemin '{path}' hors des racines autorisées"
                     )
         
         return params

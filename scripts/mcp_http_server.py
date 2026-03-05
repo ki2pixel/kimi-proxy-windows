@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import TypedDict
@@ -31,21 +32,129 @@ def _jsonrpc_error(req_id: object, code: int, message: str) -> dict[str, object]
     return {"jsonrpc": "2.0", "id": req_id, "error": error}
 
 
-def _safe_path(root: Path, raw_path: str) -> Path:
-    candidate = Path(raw_path).expanduser().resolve()
-    candidate.relative_to(root)
-    return candidate
+def _log_security_event(event: str, **fields: object) -> None:
+    payload: dict[str, object] = {"event": event}
+    payload.update(fields)
+    sys.stderr.write(json.dumps(payload, ensure_ascii=False) + "\n")
+    sys.stderr.flush()
+
+
+def _parse_mcp_disk_roots(raw_value: str) -> list[Path]:
+    normalized = raw_value.strip()
+    if not normalized:
+        return []
+
+    if ";" in normalized:
+        raw_items = normalized.split(";")
+    elif "," in normalized:
+        raw_items = normalized.split(",")
+    else:
+        raw_items = [normalized]
+
+    roots: list[Path] = []
+    for raw_item in raw_items:
+        item = raw_item.strip()
+        if not item:
+            continue
+        try:
+            roots.append(Path(item).expanduser().resolve(strict=False))
+        except (OSError, RuntimeError, ValueError) as exc:
+            _log_security_event(
+                "mcp_allowed_roots_item_invalid",
+                raw=item,
+                reason=str(exc),
+            )
+    return roots
+
+
+def _resolve_allowed_roots() -> list[Path]:
+    disk_roots_raw = os.environ.get("MCP_DISK_ROOTS")
+    if disk_roots_raw is not None:
+        parsed_roots = _parse_mcp_disk_roots(disk_roots_raw)
+        if parsed_roots:
+            return parsed_roots
+        _log_security_event(
+            "mcp_allowed_roots_invalid_fallback",
+            source="MCP_DISK_ROOTS",
+            value=disk_roots_raw,
+        )
+
+    for source in ("MCP_ALLOWED_ROOT", "WORKSPACE_PATH"):
+        raw = os.environ.get(source)
+        if raw is None:
+            continue
+        cleaned = raw.strip()
+        if not cleaned:
+            _log_security_event(
+                "mcp_allowed_roots_item_invalid",
+                source=source,
+                raw=raw,
+                reason="empty",
+            )
+            continue
+        try:
+            return [Path(cleaned).expanduser().resolve(strict=False)]
+        except (OSError, RuntimeError, ValueError) as exc:
+            _log_security_event(
+                "mcp_allowed_roots_item_invalid",
+                source=source,
+                raw=cleaned,
+                reason=str(exc),
+            )
+
+    return [Path.cwd().resolve(strict=False)]
+
+
+def _is_path_allowed(raw_path: str, allowed_roots: list[Path]) -> tuple[bool, Path | None, str]:
+    try:
+        requested = Path(raw_path).expanduser()
+        if not requested.is_absolute():
+            requested = Path.cwd() / requested
+        resolved = requested.resolve(strict=False)
+    except (OSError, RuntimeError, ValueError) as exc:
+        return False, None, f"resolve_error:{exc}"
+
+    for root in allowed_roots:
+        try:
+            resolved.relative_to(root)
+            return True, resolved, "allowed"
+        except ValueError:
+            continue
+
+    return False, resolved, "outside_allowed_roots"
+
+
+def _safe_path(allowed_roots: list[Path], raw_path: str) -> Path:
+    allowed, resolved, reason = _is_path_allowed(raw_path, allowed_roots)
+    if not allowed or resolved is None:
+        raise PermissionError(f"Access denied for path '{raw_path}': {reason}")
+    return resolved
 
 
 class MCPHandler(BaseHTTPRequestHandler):
     server_version = "KimiMCPHTTP/1.0"
 
+    def __init__(self, *args: object, **kwargs: object) -> None:
+        self._allowed_roots_cache = _resolve_allowed_roots()
+        super().__init__(*args, **kwargs)
+
     def _kind(self) -> str:
         return os.environ.get("MCP_SERVER_KIND", "unknown")
 
-    def _allowed_root(self) -> Path:
-        raw = os.environ.get("MCP_ALLOWED_ROOT", str(Path.cwd()))
-        return Path(raw).resolve()
+    def _allowed_roots(self) -> list[Path]:
+        return self._allowed_roots_cache
+
+    def _assert_allowed_path(self, raw_path: str, tool_name: str) -> Path:
+        allowed, resolved, reason = _is_path_allowed(raw_path, self._allowed_roots())
+        if not allowed or resolved is None:
+            _log_security_event(
+                "mcp_path_access_denied",
+                tool=tool_name,
+                path=raw_path,
+                reason=reason,
+            )
+            raise PermissionError(f"Access denied for path '{raw_path}': outside allowed roots")
+        return resolved
 
     def do_GET(self) -> None:  # noqa: N802
         if self.path == "/health":
@@ -126,10 +235,48 @@ class MCPHandler(BaseHTTPRequestHandler):
             ]
         if kind == "fast-filesystem":
             return [
-                {"name": "fast_read_file", "description": "Lit un fichier", "inputSchema": {"type": "object"}},
-                {"name": "fast_list_directory", "description": "Liste un dossier", "inputSchema": {"type": "object"}},
-                {"name": "fast_get_directory_tree", "description": "Arbre dossier", "inputSchema": {"type": "object"}},
-                {"name": "fast_search_files", "description": "Recherche nom de fichier", "inputSchema": {"type": "object"}},
+                {
+                    "name": "fast_read_file",
+                    "description": "Lit un fichier",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "path": {"type": "string", "description": "Chemin absolu du fichier à lire"}
+                        },
+                        "required": ["path"],
+                    },
+                },
+                {
+                    "name": "fast_list_directory",
+                    "description": "Liste un dossier",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "path": {"type": "string", "description": "Chemin absolu du dossier (optionnel)"}
+                        },
+                    },
+                },
+                {
+                    "name": "fast_get_directory_tree",
+                    "description": "Arbre dossier",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "path": {"type": "string", "description": "Chemin absolu du fichier/dossier (optionnel)"}
+                        },
+                    },
+                },
+                {
+                    "name": "fast_search_files",
+                    "description": "Recherche nom de fichier",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "path": {"type": "string", "description": "Chemin absolu du dossier (optionnel)"},
+                            "pattern": {"type": "string", "description": "Pattern glob de recherche"},
+                        },
+                    },
+                },
             ]
         if kind == "json-query":
             return [
@@ -174,23 +321,36 @@ class MCPHandler(BaseHTTPRequestHandler):
         return _jsonrpc_error(req_id, -32601, f"Unknown tool: {name}")
 
     def _handle_fast_filesystem(self, req_id: object, name: str, args: dict[str, object]) -> dict[str, object]:
-        root = self._allowed_root()
+        roots = self._allowed_roots()
         path_obj = args.get("path")
-        target = _safe_path(root, str(path_obj)) if path_obj is not None else root
-
         if name == "fast_read_file":
+            if path_obj is None:
+                return _jsonrpc_error(req_id, -32602, "path is required for fast_read_file")
+
+            target = _safe_path(roots, str(path_obj))
+            if not target.exists() or not target.is_file():
+                return _jsonrpc_error(req_id, -32602, "path must point to an existing file")
+
             content = target.read_text(encoding="utf-8")
             return _jsonrpc_result(req_id, self._tool_content(content))
 
+        target = _safe_path(roots, str(path_obj)) if path_obj is not None else roots[0]
+
         if name == "fast_list_directory":
+            if not target.exists() or not target.is_dir():
+                return _jsonrpc_error(req_id, -32602, "path must point to an existing directory")
             items = [str(p.name) for p in target.iterdir()]
             return _jsonrpc_result(req_id, self._tool_content(json.dumps(items, ensure_ascii=False)))
 
         if name == "fast_get_directory_tree":
+            if not target.exists():
+                return _jsonrpc_error(req_id, -32602, "path must point to an existing file or directory")
             tree = self._build_tree(target)
             return _jsonrpc_result(req_id, self._tool_content(json.dumps(tree, ensure_ascii=False)))
 
         if name == "fast_search_files":
+            if not target.exists() or not target.is_dir():
+                return _jsonrpc_error(req_id, -32602, "path must point to an existing directory")
             pattern_obj = args.get("pattern")
             pattern = pattern_obj if isinstance(pattern_obj, str) and pattern_obj else "*"
             matches = [str(p) for p in target.rglob(pattern)]
@@ -209,6 +369,10 @@ class MCPHandler(BaseHTTPRequestHandler):
         return node
 
     def _json_query(self, req_id: object, name: str, args: dict[str, object]) -> dict[str, object]:
+        raw_file_path = args.get("file_path")
+        if isinstance(raw_file_path, str) and raw_file_path.strip():
+            self._assert_allowed_path(raw_file_path, name)
+
         json_path_obj = args.get("path")
         raw_json_obj = args.get("json")
         if isinstance(raw_json_obj, str):
@@ -282,6 +446,12 @@ class MCPHandler(BaseHTTPRequestHandler):
 def main() -> None:
     host = os.environ.get("MCP_SERVER_HOST", "0.0.0.0")
     port = int(os.environ.get("MCP_SERVER_PORT", "8000"))
+    allowed_roots = _resolve_allowed_roots()
+    _log_security_event(
+        "mcp_allowed_roots_loaded",
+        server=os.environ.get("MCP_SERVER_KIND", "unknown"),
+        roots=[str(root) for root in allowed_roots],
+    )
     httpd = ThreadingHTTPServer((host, port), MCPHandler)
     httpd.serve_forever()
 

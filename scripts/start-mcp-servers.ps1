@@ -9,6 +9,9 @@ $RuntimeRoot = if ($env:KIMI_PROXY_TMP_ROOT) { $env:KIMI_PROXY_TMP_ROOT } else {
 $McpRuntimeDir = Join-Path $RuntimeRoot "mcp"
 $McpLogDir = Join-Path $RuntimeRoot "logs"
 $ProxyHealthUrl = if ($env:KIMI_PROXY_HEALTH_URL) { $env:KIMI_PROXY_HEALTH_URL } else { "http://127.0.0.1:8000/health" }
+$ProxyPidFile = Join-Path $ProjectDir ".server.pid"
+$ProxyLogFile = Join-Path $ProjectDir "server.log"
+$ProxyErrLogFile = Join-Path $ProjectDir "server.err.log"
 
 $CompressionPort = 8001
 $SequentialPort = 8003
@@ -115,6 +118,17 @@ function Wait-PortListening([int]$Port, [int]$MaxWaitSeconds = 15) {
     return $false
 }
 
+function Wait-PortClosed([int]$Port, [int]$MaxWaitSeconds = 10) {
+    $deadline = (Get-Date).AddSeconds($MaxWaitSeconds)
+    while ((Get-Date) -lt $deadline) {
+        if (-not (Test-PortListening $Port)) {
+            return $true
+        }
+        Start-Sleep -Milliseconds 300
+    }
+    return (-not (Test-PortListening $Port))
+}
+
 function Start-Pruner {
     Ensure-Venv
     $existing = Get-LiveProcessByPidFile -PidFile $PrunerPidFile
@@ -170,6 +184,11 @@ function Start-GenericMcpHttpServer {
     $env:MCP_SERVER_KIND = $Kind
     $env:MCP_SERVER_HOST = "0.0.0.0"
     $env:MCP_SERVER_PORT = "$Port"
+    $diskRoots = $env:MCP_DISK_ROOTS
+    if ([string]::IsNullOrWhiteSpace($diskRoots)) {
+        $diskRoots = $ProjectDir
+    }
+    $env:MCP_DISK_ROOTS = $diskRoots
     $env:MCP_ALLOWED_ROOT = $ProjectDir
 
     $errFile = "$LogFile.err"
@@ -239,8 +258,72 @@ function Show-McpStatus {
     Show-PortStatus -Name "MCP Pruner" -Port $PrunerPort
 }
 
+function Get-ProxyProcessByPidFile {
+    if (-not (Test-Path $ProxyPidFile)) {
+        return $null
+    }
+
+    $procIdText = (Get-Content $ProxyPidFile -Raw).Trim()
+    if ([string]::IsNullOrWhiteSpace($procIdText) -or $procIdText -notmatch '^[0-9]+$') {
+        Remove-Item $ProxyPidFile -Force -ErrorAction SilentlyContinue
+        return $null
+    }
+
+    $proc = Get-Process -Id ([int]$procIdText) -ErrorAction SilentlyContinue
+    if ($null -eq $proc) {
+        Remove-Item $ProxyPidFile -Force -ErrorAction SilentlyContinue
+        return $null
+    }
+    return $proc
+}
+
+function Ensure-ProxyRunning {
+    if (Test-HttpHealth -Url $ProxyHealthUrl -TimeoutSec 2) {
+        return
+    }
+
+    Write-Warn "Proxy health unreachable via $ProxyHealthUrl. Attempting auto-start on port 8000..."
+    Ensure-Venv
+
+    $existing = Get-ProxyProcessByPidFile
+    if ($null -eq $existing) {
+        $existingPythonPath = if ($env:PYTHONPATH) { "$($env:PYTHONPATH);" } else { "" }
+        $env:PYTHONPATH = "${existingPythonPath}$ProjectDir\src"
+        $env:PYTHONIOENCODING = "utf-8"
+        $env:PYTHONUTF8 = "1"
+
+        $proxyProc = Start-Process -FilePath $VenvPython `
+            -ArgumentList @("-m", "uvicorn", "kimi_proxy.main:app", "--host", "0.0.0.0", "--port", "8000") `
+            -WorkingDirectory $ProjectDir `
+            -RedirectStandardOutput $ProxyLogFile `
+            -RedirectStandardError $ProxyErrLogFile `
+            -PassThru
+
+        Set-Content -Path $ProxyPidFile -Value "$($proxyProc.Id)"
+        Start-Sleep -Milliseconds 500
+    }
+
+    if (Wait-HttpHealth -Url $ProxyHealthUrl -MaxWaitSeconds 20) {
+        Write-Ok "Proxy health reachable via $ProxyHealthUrl"
+        return
+    }
+
+    Write-Warn "Proxy auto-start failed. Cline streamableHttp MCP servers may return fetch failed."
+}
+
 function Start-McpServers {
+    param(
+        [switch]$ForceCleanStart
+    )
+
+    if ($ForceCleanStart) {
+        Write-Info "Force clean start requested: stopping existing MCP helper processes first"
+        Stop-McpServers -SkipBanner
+        Start-Sleep -Milliseconds 700
+    }
+
     Ensure-Dirs
+    Ensure-ProxyRunning
     Write-Info "Starting MCP Windows helpers"
     Write-Info "Expected ports: compression=$CompressionPort sequential=$SequentialPort fast-filesystem=$FastFilesystemPort json-query=$JsonQueryPort pruner=$PrunerPort"
 
@@ -259,7 +342,13 @@ function Start-McpServers {
 }
 
 function Stop-McpServers {
-    Write-Info "Stopping MCP Windows helpers"
+    param(
+        [switch]$SkipBanner
+    )
+
+    if (-not $SkipBanner) {
+        Write-Info "Stopping MCP Windows helpers"
+    }
 
     foreach ($pidFile in @($CompressionPidFile, $SequentialPidFile, $FastFilesystemPidFile, $JsonQueryPidFile, $PrunerPidFile)) {
         Stop-FromPidFile -PidFile $pidFile
@@ -269,19 +358,25 @@ function Stop-McpServers {
         Stop-ByPort -Port $port
     }
 
-    Write-Ok "MCP stop completed"
+    foreach ($port in @($CompressionPort, $SequentialPort, $FastFilesystemPort, $JsonQueryPort, $PrunerPort)) {
+        if (-not (Wait-PortClosed -Port $port -MaxWaitSeconds 8)) {
+            Write-Warn "Port $port still listening after stop attempt (possible non-MCP process or delayed release)"
+        }
+    }
+
+    if (-not $SkipBanner) {
+        Write-Ok "MCP stop completed"
+    }
 }
 
 $command = if ($args.Count -gt 0) { $args[0] } else { "start" }
 
 switch ($command) {
-    "start" { Start-McpServers }
+    "start" { Start-McpServers -ForceCleanStart }
     "stop" { Stop-McpServers }
     "status" { Show-McpStatus }
     "restart" {
-        Stop-McpServers
-        Start-Sleep -Seconds 1
-        Start-McpServers
+        Start-McpServers -ForceCleanStart
     }
     default {
         Write-Host "Usage: .\scripts\start-mcp-servers.ps1 [start|stop|status|restart]"

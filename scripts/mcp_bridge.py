@@ -776,14 +776,23 @@ def _resolve_windows_npm_global_command(command_name: str) -> str | None:
 
 
 def _build_filesystem_agent_command() -> RelayCommand:
-    allowed_root = os.getenv("MCP_FILESYSTEM_ALLOWED_ROOT", "/home/kidpixel")
+    disk_roots_raw = os.getenv("MCP_DISK_ROOTS")
+    allowed_roots: list[str] = []
+    if isinstance(disk_roots_raw, str) and disk_roots_raw.strip():
+        separator = ";" if ";" in disk_roots_raw else ","
+        allowed_roots = [item.strip() for item in disk_roots_raw.split(separator) if item.strip()]
+
+    if not allowed_roots:
+        allowed_root = os.getenv("MCP_FILESYSTEM_ALLOWED_ROOT", "/home/kidpixel")
+        allowed_roots = [allowed_root]
+
     windows_direct = _resolve_windows_npm_global_command("mcp-server-filesystem.cmd")
     default_cmd = windows_direct if windows_direct is not None else ("npx.cmd" if os.name == "nt" else "npx")
     cmd = os.getenv("MCP_FILESYSTEM_COMMAND", default_cmd)
     if _is_npx_command(cmd):
-        args = ["-y", "@modelcontextprotocol/server-filesystem", allowed_root]
+        args = ["-y", "@modelcontextprotocol/server-filesystem", *allowed_roots]
     else:
-        args = [allowed_root]
+        args = allowed_roots
 
     env = _base_relay_env()
     env.setdefault("PATH", _get_default_path_env())

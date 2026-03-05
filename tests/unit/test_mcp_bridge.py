@@ -74,6 +74,7 @@ def test_base_relay_env_respects_bridge_path_env(monkeypatch):
 @pytest.mark.unit
 def test_build_filesystem_agent_command_includes_allowed_root(monkeypatch):
     mcp_bridge = _import_mcp_bridge()
+    monkeypatch.delenv("MCP_DISK_ROOTS", raising=False)
     monkeypatch.setenv("MCP_FILESYSTEM_ALLOWED_ROOT", "/tmp")
     monkeypatch.setenv("MCP_FILESYSTEM_COMMAND", "npx")
     monkeypatch.delenv("MCP_BRIDGE_PATH_ENV", raising=False)
@@ -82,6 +83,28 @@ def test_build_filesystem_agent_command_includes_allowed_root(monkeypatch):
     assert cmd.command == "npx"
     assert cmd.args[-1] == "/tmp"
     assert "@modelcontextprotocol/server-filesystem" in cmd.args
+
+
+@pytest.mark.unit
+def test_build_filesystem_agent_command_uses_mcp_disk_roots_when_present(monkeypatch):
+    mcp_bridge = _import_mcp_bridge()
+    monkeypatch.setenv("MCP_DISK_ROOTS", "C:\\;D:\\;F:\\;G:\\")
+    monkeypatch.setenv("MCP_FILESYSTEM_COMMAND", "npx")
+
+    cmd = mcp_bridge._build_filesystem_agent_command()
+    assert cmd.command == "npx"
+    assert cmd.args[:2] == ["-y", "@modelcontextprotocol/server-filesystem"]
+    assert cmd.args[2:] == ["C:\\", "D:\\", "F:\\", "G:\\"]
+
+
+@pytest.mark.unit
+def test_build_filesystem_agent_command_uses_mcp_disk_roots_comma_separator(monkeypatch):
+    mcp_bridge = _import_mcp_bridge()
+    monkeypatch.setenv("MCP_DISK_ROOTS", "C:\\,D:\\")
+    monkeypatch.setenv("MCP_FILESYSTEM_COMMAND", "npx")
+
+    cmd = mcp_bridge._build_filesystem_agent_command()
+    assert cmd.args[2:] == ["C:\\", "D:\\"]
 
 
 @pytest.mark.unit
