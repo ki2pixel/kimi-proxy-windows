@@ -1,0 +1,102 @@
+# PRD — Audit complet de compatibilité cross-platform (Ubuntu Linux → Windows 11) pour `kimi-proxy`
+
+## 1) Contexte et objectif
+Ce document formalise la phase de planification d’un audit de migration de `kimi-proxy` depuis Ubuntu Linux vers Windows 11.
+
+Objectif principal :
+- Évaluer la compatibilité native Windows 11 (sans se limiter à Docker),
+- Identifier tous les écarts techniques bloquants ou risqués,
+- Produire un backlog de remédiation priorisé (P0→P3),
+- Définir un plan de migration progressif, réversible, et vérifiable.
+
+Contraintes de mission (obligatoires) :
+- Aucune modification de code produit tant que la planification/validation n’est pas finalisée.
+- Aucune hypothèse spéculative : chaque conclusion doit être reliée à une preuve du dépôt.
+- Préserver l’architecture 5 couches : API ← Services ← Features ← Proxy ← Core.
+- Préserver les standards projet : async obligatoire, typing strict, HTTPX only, sécurité, UI FR.
+- Docker autorisé uniquement pour isolation/validation, pas comme substitut à la compatibilité native Windows.
+
+## 2) Périmètre d’audit
+### In scope
+1. Dépendances Python/runtime et compatibilité Windows 11.
+2. Scripts d’exploitation (`scripts/`, `bin/`, `start/stop`) et équivalents PowerShell/CMD.
+3. Gestion des chemins fichiers temporaires et chemins absolus Linux hardcodés.
+4. Couche MCP (serveurs, bridge, launch scripts, stdio/HTTP, quoting de paths).
+5. Base SQLite (emplacement, locking, sauvegarde, comportements multi-OS).
+6. Tests (unit/integration/e2e) et exécution cross-platform.
+7. Pipeline CI/CD multi-OS (ou absence de pipeline versionné).
+8. Frontend/dashboard (assets, scripts npm/node, compatibilité exécution locale).
+9. Documentation opérationnelle FR (README/deployment/troubleshooting).
+
+### Out of scope (à ce stade)
+- Refonte fonctionnelle majeure du produit.
+- Changement d’architecture 5 couches.
+- Migration de base de données vers un autre moteur.
+
+## 3) Preuves factuelles collectées (extraits)
+Sources contrôlées :
+- `requirements.txt`
+- `requirements-dev.txt`
+- `config.toml`
+- `scripts/start-mcp-servers.sh`
+- `bin/kimi-proxy`
+- `src/kimi_proxy/config/settings.py`
+- `src/kimi_proxy/core/constants.py`
+- `src/kimi_proxy/features/cline_importer/importer.py`
+- `tests/run_mcp_tests_quick.sh`
+
+### 3.1 Dépendances (baseline)
+- `requirements.txt` contient notamment : `fastapi`, `uvicorn[standard]`, `httpx`, `tiktoken`.
+- `requirements-dev.txt` contient notamment : `pytest`, `pytest-asyncio`, `pytest-cov`, `ruff`, `mypy`, `mkdocs`.
+
+### 3.2 Signaux Linux-only et chemins hardcodés
+- `config.toml`: `tmp_dir = "/tmp/kimi_proxy_masked"`.
+- `scripts/start-mcp-servers.sh`:
+  - shebang `#!/bin/bash`,
+  - usages `nohup`, `python3`, `kill -0`, `chmod +x`,
+  - multiples écritures/lectures sous `/tmp/*`,
+  - valeurs par défaut `/home/kidpixel` et `/home/kidpixel/kimi-proxy`.
+- `bin/kimi-proxy`:
+  - shebang `#!/bin/bash`,
+  - commandes `python3`, `uvicorn`, `pytest` via shell Linux.
+- `src/kimi_proxy/config/settings.py` et `src/kimi_proxy/core/constants.py`:
+  - valeur par défaut `"/tmp/kimi_proxy_masked"`.
+- `src/kimi_proxy/features/cline_importer/importer.py`:
+  - `ALLOWED_LEDGER_PATH = "/home/kidpixel/.cline/data/state/taskHistory.json"`.
+- `tests/run_mcp_tests_quick.sh`:
+  - shebang `#!/bin/bash`,
+  - messages et commandes orientés Linux (`python3`, `pytest`, path `/home/kidpixel/kimi-proxy`).
+
+### 3.3 CI/CD
+- Aucune arborescence `.github/` détectée dans ce dépôt local au moment de l’audit initial (à confirmer dans l’exécution des sous-tâches).
+
+## 4) Risques initiaux
+- R1 (Élevé) : scripts Bash non exécutables nativement sur Windows sans couche POSIX.
+- R2 (Élevé) : chemins `/tmp` et `/home/kidpixel` non portables.
+- R3 (Élevé) : démarrage/arrêt MCP dépendant de patterns shell (`nohup`, `kill -0`, PID files `/tmp`).
+- R4 (Moyen) : exécution tests/ops focalisée Linux (`.sh`, `python3`, environnement shell).
+- R5 (Moyen) : absence potentielle de validation CI multi-OS dans le repo.
+
+## 5) Livrables attendus (phase audit)
+1. Matrice de compatibilité Windows 11 par domaine (dépendances, scripts, MCP, DB, tests, frontend, CI, docs).
+2. Score global + sous-scores par domaine.
+3. Backlog priorisé P0/P1/P2/P3 avec effort, impact et risque.
+4. Plan de migration pas-à-pas, incluant rollback détaillé.
+5. Plan de test cross-platform (Linux + Windows 11) avec critères d’acceptation.
+6. Plan de mise à jour documentation FR (README/deployment/troubleshooting).
+
+## 6) Méthode d’exécution imposée
+- Pipeline Shrimp obligatoire :
+  1) `plan_task`
+  2) `analyze_task`
+  3) `reflect_task`
+  4) `split_tasks`
+  5) `execute_task` + `verify_task` (score >= 80)
+- Checkpoint `process_thought(...)` avant chaque jalon majeur.
+- Aucune spéculation : tous les constats doivent être appuyés par lecture/recherche dans le dépôt.
+
+## 7) Critères de réussite
+- Plan complet de migration Windows 11 validé avec preuves techniques.
+- Aucune régression d’architecture ni de standards projet.
+- Backlog exécutable, priorisé et vérifié.
+- Documentation FR alignée avec la stratégie de migration et de rollback.

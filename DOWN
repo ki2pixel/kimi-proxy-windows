@@ -1,0 +1,4 @@
+http://localhost:8000/api/mcp-gateway/sequential-thinking/rpc = (Le d‚lai de l'op‚ration a expir‚.)
+http://localhost:8000/api/mcp-gateway/fast-filesystem/rpc = (Le d‚lai de l'op‚ration a expir‚.)
+http://localhost:8000/api/mcp-gateway/json-query/rpc = (Le d‚lai de l'op‚ration a expir‚.)
+http://localhost:8006/rpc = (Le d‚lai de l'op‚ration a expir‚.)
