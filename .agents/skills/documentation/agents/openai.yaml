@@ -1,0 +1,10 @@
+interface:
+  display_name: "Documentation"
+  short_description: "Rédaction technique Kimi Proxy"
+  default_prompt: "Rédige ou refactore cette documentation Kimi Proxy avec structure claire, trade-offs et exemples utiles."
+
+policy:
+  allow_implicit_invocation: true
+
+dependencies:
+  tools: []

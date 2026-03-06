@@ -1,0 +1,152 @@
+[mcp_servers.filesystem-agent]
+command = "C:/Users/kidpixel/Documents/kimi-proxy/venv/Scripts/python.exe"
+args = ["C:/Users/kidpixel/Documents/kimi-proxy/scripts/mcp_bridge.py", "filesystem-agent"]
+startup_timeout_sec = 20
+tool_timeout_sec = 60
+enabled = true
+required = true
+
+[mcp_servers.filesystem-agent.env]
+PATH = "C:\\Windows\\System32;C:\\Windows;C:\\Program Files\\Git\\bin;C:\\Program Files\\nodejs"
+MCP_BRIDGE_PATH_ENV = "C:\\Windows\\System32;C:\\Windows;C:\\Program Files\\Git\\bin;C:\\Program Files\\nodejs"
+MCP_FILESYSTEM_ALLOWED_ROOT = "C:/Users/kidpixel/Documents/kimi-proxy"
+MCP_BRIDGE_MONITORING_ENABLED = "1"
+MCP_BRIDGE_MONITORING_LOG_PATH = "C:/Users/kidpixel/AppData/Local/Temp/kimi-proxy/mcp-bridge-filesystem.jsonl"
+MCP_BRIDGE_MONITORING_QUEUE_MAX = "1000"
+MCP_BRIDGE_MONITORING_SUMMARY_ON_EXIT = "1"
+KIMI_MCP_TOOL_PRUNING_ENABLED = "1"
+KIMI_MCP_TOOL_PRUNING_MIN_CHARS = "4000"
+KIMI_MCP_TOOL_PRUNING_TIMEOUT_MS = "1500"
+KIMI_MCP_TOOL_PRUNING_MAX_CHARS_FALLBACK = "0"
+KIMI_MCP_PRUNING_GOAL_HINT = "compress tool output"
+KIMI_MCP_TOOL_PRUNING_MAX_PRUNE_RATIO = "0.55"
+KIMI_MCP_TOOL_PRUNING_MIN_KEEP_LINES = "40"
+KIMI_MCP_TOOL_PRUNING_ANNOTATE_LINES = "true"
+KIMI_MCP_TOOL_PRUNING_INCLUDE_MARKERS = "true"
+KIMI_MCP_PRUNER_RPC_URL = "http://localhost:8006/rpc"
+KIMI_MCP_TOOL_PRUNING_METRICS_STDERR = "1"
+KIMI_MCP_TOOL_PRUNING_METRICS_STDERR_INTERVAL_S = "10"
+KIMI_MCP_TOOL_PRUNING_METRICS_HEALTH = "1"
+
+[mcp_servers.ripgrep-agent]
+command = "C:/Users/kidpixel/Documents/kimi-proxy/venv/Scripts/python.exe"
+args = ["C:/Users/kidpixel/Documents/kimi-proxy/scripts/mcp_bridge.py", "ripgrep-agent"]
+startup_timeout_sec = 20
+tool_timeout_sec = 60
+enabled = true
+required = true
+
+[mcp_servers.ripgrep-agent.env]
+PATH = "C:\\Windows\\System32;C:\\Windows;C:\\Program Files\\Git\\bin;C:\\Program Files\\nodejs"
+MCP_BRIDGE_PATH_ENV = "C:\\Windows\\System32;C:\\Windows;C:\\Program Files\\Git\\bin;C:\\Program Files\\nodejs"
+MCP_BRIDGE_STDIO_STREAM_LIMIT = "8388608"
+MCP_BRIDGE_MONITORING_ENABLED = "1"
+MCP_BRIDGE_MONITORING_LOG_PATH = "C:/Users/kidpixel/AppData/Local/Temp/kimi-proxy/mcp-bridge-ripgrep.jsonl"
+MCP_BRIDGE_MONITORING_QUEUE_MAX = "1000"
+MCP_BRIDGE_MONITORING_SUMMARY_ON_EXIT = "1"
+KIMI_MCP_TOOL_PRUNING_ENABLED = "1"
+KIMI_MCP_TOOL_PRUNING_MIN_CHARS = "4000"
+KIMI_MCP_TOOL_PRUNING_TIMEOUT_MS = "1500"
+KIMI_MCP_TOOL_PRUNING_MAX_CHARS_FALLBACK = "0"
+KIMI_MCP_PRUNING_GOAL_HINT = "compress tool output"
+KIMI_MCP_TOOL_PRUNING_MAX_PRUNE_RATIO = "0.55"
+KIMI_MCP_TOOL_PRUNING_MIN_KEEP_LINES = "40"
+KIMI_MCP_TOOL_PRUNING_ANNOTATE_LINES = "true"
+KIMI_MCP_TOOL_PRUNING_INCLUDE_MARKERS = "true"
+KIMI_MCP_PRUNER_RPC_URL = "http://localhost:8006/rpc"
+KIMI_MCP_TOOL_PRUNING_METRICS_STDERR = "1"
+KIMI_MCP_TOOL_PRUNING_METRICS_STDERR_INTERVAL_S = "10"
+KIMI_MCP_TOOL_PRUNING_METRICS_HEALTH = "1"
+
+[mcp_servers.shrimp-task-manager]
+command = "C:/Users/kidpixel/Documents/kimi-proxy/venv/Scripts/python.exe"
+args = ["C:/Users/kidpixel/Documents/kimi-proxy/scripts/mcp_bridge.py", "shrimp-task-manager"]
+startup_timeout_sec = 20
+tool_timeout_sec = 60
+enabled = true
+required = true
+
+[mcp_servers.shrimp-task-manager.env]
+PATH = "C:\\Windows\\System32;C:\\Windows;C:\\Program Files\\Git\\bin;C:\\Program Files\\nodejs"
+MCP_BRIDGE_PATH_ENV = "C:\\Windows\\System32;C:\\Windows;C:\\Program Files\\Git\\bin;C:\\Program Files\\nodejs"
+MCP_SHRIMP_TASK_MANAGER_COMMAND = "C:/Users/kidpixel/Documents/kimi-proxy/scripts/mcp_shrimp_task_manager.cmd"
+DATA_DIR = "C:/Users/kidpixel/Documents/kimi-proxy/shrimp_data"
+MCP_BRIDGE_MONITORING_ENABLED = "1"
+MCP_BRIDGE_MONITORING_LOG_PATH = "C:/Users/kidpixel/AppData/Local/Temp/kimi-proxy/mcp-bridge-shrimp.jsonl"
+MCP_BRIDGE_MONITORING_QUEUE_MAX = "1000"
+MCP_BRIDGE_MONITORING_SUMMARY_ON_EXIT = "1"
+KIMI_MCP_TOOL_PRUNING_ENABLED = "1"
+KIMI_MCP_TOOL_PRUNING_MIN_CHARS = "4000"
+KIMI_MCP_TOOL_PRUNING_TIMEOUT_MS = "1500"
+KIMI_MCP_TOOL_PRUNING_MAX_CHARS_FALLBACK = "0"
+KIMI_MCP_PRUNING_GOAL_HINT = "compress tool output"
+KIMI_MCP_TOOL_PRUNING_MAX_PRUNE_RATIO = "0.55"
+KIMI_MCP_TOOL_PRUNING_MIN_KEEP_LINES = "40"
+KIMI_MCP_TOOL_PRUNING_ANNOTATE_LINES = "true"
+KIMI_MCP_TOOL_PRUNING_INCLUDE_MARKERS = "true"
+KIMI_MCP_PRUNER_RPC_URL = "http://localhost:8006/rpc"
+KIMI_MCP_TOOL_PRUNING_METRICS_STDERR = "1"
+KIMI_MCP_TOOL_PRUNING_METRICS_STDERR_INTERVAL_S = "10"
+KIMI_MCP_TOOL_PRUNING_METRICS_HEALTH = "1"
+
+[mcp_servers.sequential-thinking]
+url = "http://localhost:8000/api/mcp-gateway/sequential-thinking/rpc"
+startup_timeout_sec = 20
+tool_timeout_sec = 60
+enabled = true
+required = true
+
+[mcp_servers.fast-filesystem]
+url = "http://localhost:8000/api/mcp-gateway/fast-filesystem/rpc"
+startup_timeout_sec = 20
+tool_timeout_sec = 60
+enabled = true
+required = true
+
+[mcp_servers.json-query]
+url = "http://localhost:8000/api/mcp-gateway/json-query/rpc"
+startup_timeout_sec = 20
+tool_timeout_sec = 60
+enabled = true
+required = true
+
+[mcp_servers.mcp-pruner]
+url = "http://localhost:8006/rpc"
+startup_timeout_sec = 20
+tool_timeout_sec = 60
+enabled = true
+required = true
+
+[mcp_servers.redis-signal-mcp-server]
+command = "uvx"
+args = ["--from", "redis-mcp-server@latest", "redis-mcp-server", "--url", "${REDIS_SIGNAL_MCP_URL}"]
+startup_timeout_sec = 20
+tool_timeout_sec = 60
+enabled = true
+
+[mcp_servers.photomaton-postgres]
+command = "uvx"
+args = ["--python", "3.12", "postgres-mcp", "--access-mode=unrestricted"]
+startup_timeout_sec = 20
+tool_timeout_sec = 60
+enabled = true
+
+[mcp_servers.photomaton-postgres.env]
+DATABASE_URI = "${PHOTOMATON_DATABASE_URI}"
+
+[mcp_servers.switchbot-postgres]
+command = "uvx"
+args = ["--python", "3.12", "postgres-mcp", "--access-mode=unrestricted"]
+startup_timeout_sec = 20
+tool_timeout_sec = 60
+enabled = true
+
+[mcp_servers.switchbot-postgres.env]
+DATABASE_URI = "${SWITCHBOT_DATABASE_URI}"
+
+[mcp_servers.context7]
+url = "https://mcp.context7.com/mcp"
+startup_timeout_sec = 20
+tool_timeout_sec = 60
+enabled = false
+env_http_headers = { Authorization = "CONTEXT7_AUTHORIZATION" }

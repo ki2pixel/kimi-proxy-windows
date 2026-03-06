@@ -1,0 +1,16 @@
+interface:
+  display_name: "Debugging Strategies"
+  short_description: "RCA systématique des incidents Kimi Proxy"
+  default_prompt: "Diagnostique cet incident Kimi Proxy avec une méthode RCA, hypothèses testables et plan de vérification."
+
+policy:
+  allow_implicit_invocation: true
+
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "sequential-thinking"
+      description: "Structurer le raisonnement de diagnostic"
+    - type: "mcp"
+      value: "fast-filesystem"
+      description: "Explorer logs et code de manière ciblée"

@@ -1,0 +1,16 @@
+interface:
+  display_name: "JSON Query Expert"
+  short_description: "Extraction/modification JSON massive en mode sniper"
+  default_prompt: "Extrais ou modifie uniquement la zone JSON nécessaire sans charger tout le fichier."
+
+policy:
+  allow_implicit_invocation: true
+
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "json-query"
+      description: "Interroger JSON via JSONPath/lookup"
+    - type: "mcp"
+      value: "fast-filesystem"
+      description: "Support lecture/édition ciblée"

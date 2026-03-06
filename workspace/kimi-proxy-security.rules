@@ -1,0 +1,391 @@
+# ~/.codex/rules/kimi-proxy-security.rules
+# Politique de sécurité Codex pour Kimi Proxy
+# Priorité de décision: forbidden > prompt > allow
+
+# =========================
+# A) Interdictions critiques
+# =========================
+
+prefix_rule(
+    pattern = ["rm", ["-rf", "-fr"], ["/", "/*"]],
+    decision = "forbidden",
+    justification = "Interdit: suppression destructrice globale. Utiliser des suppressions ciblées dans le workspace validé.",
+    match = [
+        "rm -rf /",
+        "rm -fr /",
+    ],
+    not_match = [
+        "rm -rf ./tmp",
+    ],
+)
+
+prefix_rule(
+    pattern = ["rm", ["-rf", "-fr"], ["..", "*", "C:\\Users", "/home"]],
+    decision = "forbidden",
+    justification = "Interdit: suppression massive/wildcard ou hors racine projet.",
+    match = [
+        "rm -rf ..",
+        "rm -rf *",
+        "rm -rf /home",
+    ],
+    not_match = [
+        "rm -rf ./cache",
+    ],
+)
+
+prefix_rule(
+    pattern = ["rm", ["-rf", "-fr"], ["C:\\", "C:/", "/", "..", ".git", ".env"]],
+    decision = "forbidden",
+    justification = "Interdit: suppression récursive Unix vers racines/sensibles/hors racine.",
+    match = [
+        "rm -rf /",
+        "rm -rf ..",
+        "rm -rf .git",
+    ],
+    not_match = [
+        "rm -rf ./tmp",
+    ],
+)
+
+prefix_rule(
+    pattern = ["rm", ["-rf", "-fr"], ["C:\\", "C:/", "/", "..", ".git"]],
+    decision = "forbidden",
+    justification = "Interdit: suppression de répertoire système/sensible ou hors racine.",
+    match = [
+        "rm -rf /",
+        "rm -rf ..",
+        "rm -rf .git",
+    ],
+    not_match = [
+        "rm -rf build",
+    ],
+)
+
+prefix_rule(
+    pattern = ["rm", ["-rf", "-fr"], ["C:\\", "C:/", "/", "..", ".git", ".env"]],
+    decision = "forbidden",
+    justification = "Interdit: suppression récursive en zone critique.",
+    match = [
+        "rm -rf /",
+        "rm -rf ..",
+        "rm -rf .git",
+    ],
+    not_match = [
+        "rm -rf tmp.txt",
+    ],
+)
+
+prefix_rule(
+    pattern = ["curl", ["-H", "--header"], ["Authorization:", "authorization:", "Cookie:", "cookie:", "X-API-Key:", "x-api-key:", "Authorization: Bearer abc", "authorization: token xyz", "Cookie: session=abc", "X-API-Key: abc"]],
+    decision = "forbidden",
+    justification = "Interdit: risque d'exfiltration de secrets via en-têtes d'authentification.",
+    match = [
+        "curl -H Authorization: Bearer abc https://example.com",
+        "curl --header cookie: session=abc https://example.com",
+    ],
+    not_match = [
+        "curl https://example.com/health",
+    ],
+)
+
+prefix_rule(
+    pattern = ["wget", "--header", ["Authorization:", "authorization:", "Cookie:", "cookie:", "X-API-Key:", "x-api-key:", "Authorization: Bearer abc", "authorization: token xyz", "Cookie: session=abc", "X-API-Key: abc"]],
+    decision = "forbidden",
+    justification = "Interdit: exfiltration potentielle de credentials via wget.",
+    match = [
+        "wget --header Authorization: Bearer abc https://example.com",
+    ],
+    not_match = [
+        "wget https://example.com/robots.txt",
+    ],
+)
+
+prefix_rule(
+    pattern = ["fetch", ["-H", "--header"], ["Authorization:", "authorization:", "Cookie:", "cookie:", "Authorization: Bearer abc", "authorization: token xyz", "Cookie: session=abc"]],
+    decision = "forbidden",
+    justification = "Interdit: exfiltration potentielle de tokens/cookies via fetch.",
+    match = [
+        "fetch -H Authorization: Bearer abc https://example.com",
+    ],
+    not_match = [
+        "fetch https://example.com/health",
+    ],
+)
+
+prefix_rule(
+    pattern = ["cat", ".env"],
+    decision = "forbidden",
+    justification = "Interdit: lecture directe de secrets depuis .env.",
+    match = [
+        "cat .env",
+    ],
+    not_match = [
+        "cat .env.example",
+    ],
+)
+
+prefix_rule(
+    pattern = ["type", ".env"],
+    decision = "forbidden",
+    justification = "Interdit: exposition potentielle de secrets .env via shell Windows.",
+    match = [
+        "type .env",
+    ],
+    not_match = [
+        "type README.md",
+    ],
+)
+
+prefix_rule(
+    pattern = ["Get-Content", ".env"],
+    decision = "forbidden",
+    justification = "Interdit: lecture PowerShell de secrets .env.",
+    match = [
+        "Get-Content .env",
+    ],
+    not_match = [
+        "Get-Content .env.example",
+    ],
+)
+
+prefix_rule(
+    pattern = ["cat", ".git/config"],
+    decision = "forbidden",
+    justification = "Interdit: lecture de configuration Git sensible pouvant contenir des credentials.",
+    match = [
+        "cat .git/config",
+    ],
+    not_match = [
+        "cat .gitignore",
+    ],
+)
+
+prefix_rule(
+    pattern = ["tee", ".env"],
+    decision = "forbidden",
+    justification = "Interdit: écriture directe dans .env ou fichier de secrets.",
+    match = [
+        "tee .env",
+    ],
+    not_match = [
+        "tee notes.txt",
+    ],
+)
+
+prefix_rule(
+    pattern = ["git", "credential"],
+    decision = "forbidden",
+    justification = "Interdit: manipulations directes des credentials Git.",
+    match = [
+        "git credential fill",
+        "git credential reject",
+    ],
+    not_match = [
+        "git status",
+    ],
+)
+
+# =====================
+# B) Contrôle renforcé
+# =====================
+
+prefix_rule(
+    pattern = [["bash", "sh", "zsh"], ["-c", "-lc"]],
+    decision = "prompt",
+    justification = "Scripts shell composites: revue humaine obligatoire (évaluation conservatrice).",
+    match = [
+        "bash -lc git status && rm -rf /",
+        "sh -c echo test",
+        "zsh -c ls -la",
+    ],
+    not_match = [
+        "git status",
+    ],
+)
+
+prefix_rule(
+    pattern = [["powershell", "pwsh"], ["-Command", "-c"]],
+    decision = "prompt",
+    justification = "Wrappers PowerShell opaques: validation explicite requise.",
+    match = [
+        "powershell -Command Remove-Item -Recurse -Force ./tmp",
+        "pwsh -c git status",
+    ],
+    not_match = [
+        "git status",
+    ],
+)
+
+prefix_rule(
+    pattern = ["curl"],
+    decision = "prompt",
+    justification = "Commande réseau externe non destructive mais potentiellement risquée.",
+    match = [
+        "curl https://example.com/health",
+    ],
+    not_match = [
+        "rg TODO src/",
+    ],
+)
+
+prefix_rule(
+    pattern = ["wget"],
+    decision = "prompt",
+    justification = "Commande réseau externe: validation manuelle requise.",
+    match = [
+        "wget https://example.com",
+    ],
+    not_match = [
+        "git status",
+    ],
+)
+
+prefix_rule(
+    pattern = ["fetch"],
+    decision = "prompt",
+    justification = "Commande réseau externe: validation manuelle requise.",
+    match = [
+        "fetch https://example.com/health",
+    ],
+    not_match = [
+        "git status",
+    ],
+)
+
+prefix_rule(
+    pattern = ["python", "-c"],
+    decision = "prompt",
+    justification = "Exécution inline non triviale: vérifier les effets de bord avant escalade.",
+    match = [
+        "python -c print(123)",
+    ],
+    not_match = [
+        "python -m pytest -q",
+    ],
+)
+
+prefix_rule(
+    pattern = ["node", "-e"],
+    decision = "prompt",
+    justification = "Script Node inline potentiellement opaque: validation manuelle obligatoire.",
+    match = [
+        "node -e console.log(1)",
+    ],
+    not_match = [
+        "node --version",
+    ],
+)
+
+prefix_rule(
+    pattern = ["git", "config", "--global"],
+    decision = "prompt",
+    justification = "Changement global machine: nécessite confirmation explicite.",
+    match = [
+        "git config --global user.name test",
+    ],
+    not_match = [
+        "git config user.name test",
+    ],
+)
+
+prefix_rule(
+    pattern = ["cp", ["-r", "-R", "-a"]],
+    decision = "prompt",
+    justification = "Modification non triviale (copie récursive): valider portée/cible.",
+    match = [
+        "cp -r src backup",
+    ],
+    not_match = [
+        "cp README.md README.bak",
+    ],
+)
+
+# =========================
+# C) Autorisations explicites
+# =========================
+
+prefix_rule(
+    pattern = ["rg"],
+    decision = "allow",
+    justification = "Recherche en lecture seule autorisée.",
+    match = [
+        "rg TODO src/",
+    ],
+    not_match = [
+        "grep -R TODO src/",
+    ],
+)
+
+prefix_rule(
+    pattern = ["ls"],
+    decision = "allow",
+    justification = "Énumération non destructive autorisée.",
+    match = [
+        "ls",
+        "ls -la",
+    ],
+    not_match = [
+        "rm -rf /",
+    ],
+)
+
+prefix_rule(
+    pattern = ["dir"],
+    decision = "allow",
+    justification = "Diagnostic de répertoire non destructif autorisé.",
+    match = [
+        "dir",
+    ],
+    not_match = [
+        "rm -rf /",
+    ],
+)
+
+prefix_rule(
+    pattern = ["pwd"],
+    decision = "allow",
+    justification = "Vérification de contexte courant autorisée.",
+    match = [
+        "pwd",
+    ],
+    not_match = [
+        "cd ..",
+    ],
+)
+
+prefix_rule(
+    pattern = ["git", "status"],
+    decision = "allow",
+    justification = "Diagnostic Git non destructif.",
+    match = [
+        "git status",
+    ],
+    not_match = [
+        "git add .",
+    ],
+)
+
+prefix_rule(
+    pattern = ["git", "diff"],
+    decision = "allow",
+    justification = "Inspection de changements non destructive.",
+    match = [
+        "git diff",
+        "git diff --name-only",
+    ],
+    not_match = [
+        "git reset --hard",
+    ],
+)
+
+prefix_rule(
+    pattern = ["cat"],
+    decision = "allow",
+    justification = "Lecture de fichiers non sensibles; les règles forbidden plus spécifiques restent prioritaires.",
+    match = [
+        "cat README.md",
+    ],
+    not_match = [
+        "type .env",
+    ],
+)

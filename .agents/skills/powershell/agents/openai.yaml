@@ -1,0 +1,10 @@
+interface:
+  display_name: "PowerShell"
+  short_description: "Automatisation Windows orientée exploitation Kimi Proxy"
+  default_prompt: "Propose des commandes PowerShell sûres et idempotentes pour ce besoin d’exploitation Kimi Proxy sous Windows."
+
+policy:
+  allow_implicit_invocation: false
+
+dependencies:
+  tools: []

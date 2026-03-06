@@ -1,0 +1,13 @@
+interface:
+  display_name: "Shrimp Task Manager"
+  short_description: "Backlog, roadmap, split et vérification des tâches"
+  default_prompt: "Transforme cette demande complexe en backlog structuré avec dépendances et critères de vérification."
+
+policy:
+  allow_implicit_invocation: true
+
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "shrimp-task-manager"
+      description: "Planification/analyse/découpage/vérification des tâches"

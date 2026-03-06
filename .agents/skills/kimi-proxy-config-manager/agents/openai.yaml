@@ -1,0 +1,16 @@
+interface:
+  display_name: "Kimi Proxy Config Manager"
+  short_description: "Gestion sûre des configs TOML/YAML providers/modèles"
+  default_prompt: "Audite ou corrige cette configuration Kimi Proxy (providers, modèles, routing, secrets via env)."
+
+policy:
+  allow_implicit_invocation: true
+
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "fast-filesystem"
+      description: "Lire/éditer les fichiers de configuration"
+    - type: "mcp"
+      value: "json-query"
+      description: "Inspection ciblée de structures JSON dérivées"

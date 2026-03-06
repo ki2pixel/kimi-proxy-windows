@@ -1,0 +1,10 @@
+interface:
+  display_name: "Commit Push"
+  short_description: "Commit et push non-interactif avec checks préalables"
+  default_prompt: "Prépare un commit propre et pousse la branche courante après validations."
+
+policy:
+  allow_implicit_invocation: false
+
+dependencies:
+  tools: []

@@ -1,0 +1,19 @@
+interface:
+  display_name: "Enhance Complex"
+  short_description: "Cadrage multi-phases avec orchestration Shrimp + sequential thinking"
+  default_prompt: "Transforme cette demande complexe en protocole multi-phases, sans implémenter la tâche."
+
+policy:
+  allow_implicit_invocation: false
+
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "fast-filesystem"
+      description: "Lecture ciblée du contexte actif Memory Bank"
+    - type: "mcp"
+      value: "sequential-thinking"
+      description: "Validation logique séquentielle des phases"
+    - type: "mcp"
+      value: "shrimp-task-manager"
+      description: "Planification/analyse/split/vérification des tâches"

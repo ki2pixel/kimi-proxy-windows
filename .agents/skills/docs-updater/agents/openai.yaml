@@ -1,0 +1,16 @@
+interface:
+  display_name: "Docs Updater"
+  short_description: "Audit structurel et synchronisation code/docs Kimi Proxy"
+  default_prompt: "Audite le code puis propose et applique une mise à jour documentation traçable."
+
+policy:
+  allow_implicit_invocation: false
+
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "fast-filesystem"
+      description: "Lecture ciblée des fichiers docs et memory-bank"
+    - type: "mcp"
+      value: "ripgrep-agent"
+      description: "Audit comparatif code/docs par recherche de patterns"

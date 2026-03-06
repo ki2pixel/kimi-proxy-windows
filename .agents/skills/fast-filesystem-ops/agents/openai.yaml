@@ -1,0 +1,13 @@
+interface:
+  display_name: "Fast Filesystem Ops"
+  short_description: "Édition chirurgicale et économe en contexte"
+  default_prompt: "Fais une modification ciblée dans le repo avec lecture minimale et diff atomique."
+
+policy:
+  allow_implicit_invocation: true
+
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "fast-filesystem"
+      description: "Lire/éditer rapidement des fichiers ciblés"

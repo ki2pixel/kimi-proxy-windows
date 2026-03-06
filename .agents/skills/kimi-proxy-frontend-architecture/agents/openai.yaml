@@ -1,0 +1,10 @@
+interface:
+  display_name: "Kimi Proxy Frontend Architecture"
+  short_description: "Architecture frontend modulaire ES6 + WebSocket + Chart.js"
+  default_prompt: "Conçois ou corrige l’architecture frontend modulaire Kimi Proxy en respectant ES6 modules et flux temps réel."
+
+policy:
+  allow_implicit_invocation: true
+
+dependencies:
+  tools: []

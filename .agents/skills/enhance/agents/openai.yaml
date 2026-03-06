@@ -1,0 +1,13 @@
+interface:
+  display_name: "Enhance"
+  short_description: "Transforme une demande brute en mega-prompt structuré"
+  default_prompt: "Convertis cette demande en mega-prompt structuré, sans implémenter la tâche."
+
+policy:
+  allow_implicit_invocation: false
+
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "fast-filesystem"
+      description: "Lecture ciblée de memory-bank/activeContext.md"

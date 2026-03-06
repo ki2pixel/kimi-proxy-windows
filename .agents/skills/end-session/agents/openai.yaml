@@ -1,0 +1,13 @@
+interface:
+  display_name: "End Session"
+  short_description: "Clôture session et synchronisation Memory Bank"
+  default_prompt: "Finalise la session et synchronise activeContext/progress selon le protocole projet."
+
+policy:
+  allow_implicit_invocation: false
+
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "fast-filesystem"
+      description: "Lecture ciblée des fichiers memory-bank"

@@ -1,0 +1,10 @@
+interface:
+  display_name: "Kimi Proxy Testing Strategies"
+  short_description: "Stratégies de tests async unit/intégration/E2E"
+  default_prompt: "Construis une stratégie de tests Kimi Proxy (unit/int/e2e) avec cas limites et non-régression."
+
+policy:
+  allow_implicit_invocation: true
+
+dependencies:
+  tools: []

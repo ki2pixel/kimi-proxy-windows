@@ -1,0 +1,10 @@
+interface:
+  display_name: "Kimi Proxy Performance Optimization"
+  short_description: "Optimisation latence, DB, tokens, cache"
+  default_prompt: "Optimise ce flux Kimi Proxy avec baseline, goulot identifié, et mesures avant/après."
+
+policy:
+  allow_implicit_invocation: true
+
+dependencies:
+  tools: []

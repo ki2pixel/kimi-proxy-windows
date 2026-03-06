@@ -1,0 +1,22 @@
+interface:
+  display_name: "Kimi Proxy MCP Integration"
+  short_description: "Intégration MCP phases 2-5 et gateway"
+  default_prompt: "Intègre ou diagnostique un flux MCP Kimi Proxy (gateway, tools, sécurité workspace, robustesse JSON-RPC)."
+
+policy:
+  allow_implicit_invocation: true
+
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "shrimp-task-manager"
+      description: "Planifier et structurer les évolutions MCP complexes"
+    - type: "mcp"
+      value: "sequential-thinking"
+      description: "Raisonnement structuré sur orchestration MCP"
+    - type: "mcp"
+      value: "fast-filesystem"
+      description: "Inspection ciblée code/config/logs MCP"
+    - type: "mcp"
+      value: "json-query"
+      description: "Validation payloads/config JSON de tooling MCP"

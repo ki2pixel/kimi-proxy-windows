@@ -1,0 +1,16 @@
+interface:
+  display_name: "Kimi Proxy Streaming Debug"
+  short_description: "Diagnostic ReadError/Timeout/SSE/WebSocket"
+  default_prompt: "Diagnostique cet incident de streaming Kimi Proxy (SSE/WebSocket/HTTPX) avec RCA et correctif testable."
+
+policy:
+  allow_implicit_invocation: true
+
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "sequential-thinking"
+      description: "Structurer l’analyse incident streaming"
+    - type: "mcp"
+      value: "fast-filesystem"
+      description: "Explorer logs/config/code de streaming"
