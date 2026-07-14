@@ -8,15 +8,12 @@ Pourquoi cette complexité:
 - Les tokens partiels doivent être extraits même en cas d'erreur
 """
 import json
-import asyncio
-from typing import Dict, Any, Optional, AsyncGenerator, Callable
+from typing import Dict, Any, Optional, AsyncGenerator
 from datetime import datetime
 
 import httpx
 
-from ..core.database import update_metric_with_real_tokens, get_session_total_tokens
-from ..services.websocket_manager import ConnectionManager
-from ..services.alerts import check_threshold_alert
+from ..core.database import update_metric_with_real_tokens
 from ..config.display import get_max_context_for_session
 
 
@@ -34,22 +31,21 @@ async def stream_generator(
     response: httpx.Response,
     session_id: int,
     metric_id: int,
-    body: bytes = None,
-    headers: dict = None,
+    body: Optional[bytes] = None,
+    headers: Optional[Dict[str, Any]] = None,
     provider_type: str = "openai",
-    models: dict = None,
-    manager: ConnectionManager = None,
+    models: Optional[Dict[str, Any]] = None,
     max_retries: int = 1,
     retry_delay: float = 1.0
 ) -> AsyncGenerator[bytes, None]:
     """
     Générateur de streaming + extraction des vrais tokens avec gestion d'erreurs.
-    
+
     Pourquoi le retry à l'intérieur du générateur:
     - Une fois que le stream commence, on ne peut pas "recommencer" la requête
     - Le retry ici concerne les reconnexions si le provider supporte les resumes
     - La plupart du temps, on fait du best-effort: on extrait ce qu'on peut
-    
+
     Args:
         response: Réponse HTTPX en streaming
         session_id: ID de la session
@@ -58,39 +54,37 @@ async def stream_generator(
         headers: Headers de la requête (optionnel)
         provider_type: Type de provider
         models: Dictionnaire des modèles
-        manager: Gestionnaire WebSocket pour broadcast
         max_retries: Nombre max de retries (pour futures implémentations resume)
         retry_delay: Délai entre retries en secondes
-        
+
     Yields:
         Chunks de la réponse
-        
+
     Raises:
         Aucune: Les erreurs sont loggées et le stream se termine proprement
     """
     buffer = b""
     first_chunk = True
     chunk_count = 0
-    error_occurred = None
     stream_start_time = datetime.now()
-    
+
     try:
         # Itération sur les chunks avec gestion d'erreurs granulaire
         async for chunk in _iter_stream_with_error_handling(response, provider_type):
             chunk_count += 1
-            
+
             # Log du premier chunk pour debug
             if first_chunk and response.status_code >= 400:
                 _log_error_response(chunk, response.status_code)
             first_chunk = False
-            
+
             # Accumulation et yield
             buffer += chunk
             yield chunk
-            
+
     except httpx.ReadError as e:
         # Erreur la plus courante: connexion interrompue
-        error_occurred = ("read_error", str(e))
+        ("read_error", str(e))
         _log_streaming_error(
             error_type="read_error",
             provider=provider_type,
@@ -100,9 +94,9 @@ async def stream_generator(
             error=str(e),
             start_time=stream_start_time
         )
-        
+
     except httpx.ConnectError as e:
-        error_occurred = ("connect_error", str(e))
+        ("connect_error", str(e))
         _log_streaming_error(
             error_type="connect_error",
             provider=provider_type,
@@ -112,9 +106,9 @@ async def stream_generator(
             error=str(e),
             start_time=stream_start_time
         )
-        
+
     except httpx.TimeoutException as e:
-        error_occurred = ("timeout_error", str(e))
+        ("timeout_error", str(e))
         _log_streaming_error(
             error_type="timeout_error",
             provider=provider_type,
@@ -124,10 +118,10 @@ async def stream_generator(
             error=str(e),
             start_time=stream_start_time
         )
-        
+
     except Exception as e:
         # Erreur inattendue - on log et on continue
-        error_occurred = ("unknown", str(e))
+        ("unknown", str(e))
         _log_streaming_error(
             error_type="unknown",
             provider=provider_type,
@@ -137,28 +131,26 @@ async def stream_generator(
             error=str(e),
             start_time=stream_start_time
         )
-    
+
     finally:
         # Extraction des tokens même si le stream a échoué
         # Pourquoi: les tokens partiels sont valides et doivent être comptabilisés
         if metric_id and session_id:
             try:
                 usage_data = extract_usage_from_stream(buffer, provider_type)
-                if usage_data and models and manager:
-                    await _broadcast_token_update(
-                        session_id, metric_id, usage_data, models, manager
-                    )
-                    
-                    # Si erreur, on broadcast aussi l'erreur
-                    if error_occurred:
-                        await _broadcast_streaming_error(
-                            session_id, metric_id, error_occurred[0], 
-                            error_occurred[1], manager
-                        )
-                        
+                if usage_data and models:
+                    _process_token_update(session_id, metric_id, usage_data, models)
             except Exception as e:
                 # Même l'extraction peut fail - on log mais on ne crash pas
                 print(f"⚠️  [STREAM] Erreur extraction usage après stream: {e}")
+
+        client_ref = getattr(response, "_client_ref", None)
+        if client_ref is not None:
+            try:
+                await client_ref.aclose()
+                print("🔒 [STREAM] Client HTTPX de streaming fermé.")
+            except Exception as e:
+                print(f"⚠️  [STREAM] Erreur lors de la fermeture du client HTTPX: {e}")
 
 
 async def _iter_stream_with_error_handling(
@@ -167,8 +159,8 @@ async def _iter_stream_with_error_handling(
 ) -> AsyncGenerator[bytes, None]:
     """
     Itère sur le stream avec timeout et gestion d'erreurs.
-    
-    Pourquoi un timeout de chunk: certains providers peuvent 
+
+    Pourquoi un timeout de chunk: certains providers peuvent
     "geler" sans fermer la connexion.
     """
     # Timeout par provider (certains sont plus lents)
@@ -177,7 +169,7 @@ async def _iter_stream_with_error_handling(
         "kimi": 30.0,        # Kimi est généralement rapide
         "default": 30.0
     }.get(provider_type, 30.0)
-    
+
     try:
         async for chunk in response.aiter_bytes():
             yield chunk
@@ -208,13 +200,13 @@ def _log_streaming_error(
 ) -> None:
     """
     Log structuré d'une erreur streaming.
-    
+
     Pourquoi cette structure: permet de parser les logs
     pour des dashboards de monitoring provider.
     """
     duration = (datetime.now() - start_time).total_seconds()
     error_msg = STREAMING_ERROR_TYPES.get(error_type, STREAMING_ERROR_TYPES["unknown"])
-    
+
     print(
         f"🔴 [STREAM_ERROR] {error_msg}\n"
         f"   Provider: {provider}\n"
@@ -225,96 +217,57 @@ def _log_streaming_error(
     )
 
 
-async def _broadcast_streaming_error(
-    session_id: int,
-    metric_id: int,
-    error_type: str,
-    error_detail: str,
-    manager: ConnectionManager
-) -> None:
-    """Diffuse une erreur streaming via WebSocket."""
-    try:
-        await manager.broadcast({
-            "type": "streaming_error",
-            "session_id": session_id,
-            "metric_id": metric_id,
-            "error_type": error_type,
-            "error_message": STREAMING_ERROR_TYPES.get(
-                error_type, STREAMING_ERROR_TYPES["unknown"]
-            ),
-            "timestamp": datetime.now().isoformat()
-        })
-    except Exception as e:
-        # Ne jamais laisser le broadcast casser le flux
-        print(f"⚠️  [STREAM] Erreur broadcast WebSocket: {e}")
-
-
-async def _broadcast_token_update(
+def _process_token_update(
     session_id: int,
     metric_id: int,
     usage_data: Dict[str, int],
-    models: dict,
-    manager: ConnectionManager
+    models: dict
 ):
-    """Diffuse la mise à jour des tokens via WebSocket."""
+    """Met à jour les tokens en base."""
     from ..core.database import get_session_by_id
-    
+
     session = get_session_by_id(session_id)
+    if not session:
+        return
+
     max_context = get_max_context_for_session(session, models)
-    
+
     prompt_tokens = usage_data.get("prompt_tokens", 0)
     completion_tokens = usage_data.get("completion_tokens", 0)
     total_tokens = usage_data.get("total_tokens", 0) or (prompt_tokens + completion_tokens)
-    
-    real_data = update_metric_with_real_tokens(
+
+    update_metric_with_real_tokens(
         metric_id,
         prompt_tokens,
         completion_tokens,
         total_tokens,
         max_context
     )
-    
-    new_totals = get_session_total_tokens(session_id)
-    cumulative_total = new_totals["total_tokens"]
-    cumulative_percentage = (cumulative_total / max_context) * 100
-    
-    alert = check_threshold_alert(cumulative_percentage)
-    
-    await manager.broadcast({
-        "type": "metric_updated",
-        "metric_id": metric_id,
-        "session_id": session_id,
-        "real_tokens": real_data,
-        "cumulative_tokens": cumulative_total,
-        "cumulative_percentage": cumulative_percentage,
-        "alert": alert,
-        "source": "proxy"
-    })
 
 
 def extract_usage_from_stream(buffer: bytes, provider_type: str = "openai") -> Optional[Dict[str, int]]:
     """
     Extrait les usage tokens du stream SSE.
-    
+
     Pourquoi on cherche dans les lignes inversées:
     - Les tokens d'usage sont généralement dans le dernier chunk
     - Format SSE: data: {...} par ligne
     - [DONE] marque la fin du stream
-    
+
     Args:
         buffer: Buffer contenant tout le stream (même partiel)
         provider_type: Type de provider
-        
+
     Returns:
         Dictionnaire avec prompt_tokens, completion_tokens, total_tokens
         ou None si pas trouvé
     """
     if not buffer:
         return None
-        
+
     text = buffer.decode('utf-8', errors='ignore')
     lines = text.strip().split('\n')
-    
+
     for line in reversed(lines):
         if line.startswith('data: '):
             data_str = line[6:]
@@ -322,7 +275,7 @@ def extract_usage_from_stream(buffer: bytes, provider_type: str = "openai") -> O
                 continue
             try:
                 data = json.loads(data_str)
-                
+
                 # Format OpenAI standard
                 if 'usage' in data and data['usage']:
                     usage = data['usage']
@@ -331,7 +284,7 @@ def extract_usage_from_stream(buffer: bytes, provider_type: str = "openai") -> O
                         "completion_tokens": usage.get("completion_tokens", 0),
                         "total_tokens": usage.get("total_tokens", 0)
                     }
-                
+
                 # Format Gemini
                 if provider_type == "gemini":
                     if 'usageMetadata' in data:
@@ -341,34 +294,34 @@ def extract_usage_from_stream(buffer: bytes, provider_type: str = "openai") -> O
                             "completion_tokens": meta.get("candidatesTokenCount", 0),
                             "total_tokens": meta.get("totalTokenCount", 0)
                         }
-                        
+
             except json.JSONDecodeError:
                 # Ligne malformée - on continue
                 continue
             except Exception:
                 # Autre erreur - on continue
                 continue
-    
+
     return None
 
 
 def extract_usage_from_response(response_data: Dict[str, Any]) -> Optional[Dict[str, int]]:
     """
     Extrait les usage tokens d'une réponse complète (non-streaming).
-    
+
     Args:
         response_data: Données JSON de la réponse (dict ou list pour Gemini)
-        
+
     Returns:
         Dictionnaire avec prompt_tokens, completion_tokens, total_tokens
     """
     # Gemini peut retourner une liste au lieu d'un dict
     if isinstance(response_data, list) and len(response_data) > 0:
         response_data = response_data[0]
-    
+
     if not isinstance(response_data, dict):
         return None
-    
+
     usage = response_data.get('usage', {})
     if usage:
         return {

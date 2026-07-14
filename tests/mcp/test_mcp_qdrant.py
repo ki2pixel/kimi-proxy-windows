@@ -8,14 +8,11 @@ Vérifie:
 - Fallbacks appropriés
 """
 import pytest
-import pytest_asyncio
-from unittest.mock import Mock, AsyncMock, patch, call
-from datetime import datetime
+from unittest.mock import Mock, AsyncMock
 
 from kimi_proxy.features.mcp.servers.qdrant import QdrantMCPClient
 from kimi_proxy.features.mcp.base.config import MCPClientConfig
 from kimi_proxy.features.mcp.base.rpc import MCPRPCClient
-from kimi_proxy.core.models import MCPCluster
 
 
 @pytest.fixture

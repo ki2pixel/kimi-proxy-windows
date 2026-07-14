@@ -9,12 +9,8 @@ Valide:
 - Timeout et erreurs
 """
 import pytest
-import pytest_asyncio
-from unittest.mock import Mock, AsyncMock, patch
-import json
-import tempfile
+from unittest.mock import Mock, AsyncMock
 import os
-from datetime import datetime
 
 from kimi_proxy.features.mcp.servers.json_query import JsonQueryMCPClient
 from kimi_proxy.features.mcp.base.config import MCPClientConfig
@@ -240,12 +236,6 @@ async def test_jsonpath_invalid_json_file(client, mock_rpc):
 @pytest.mark.asyncio
 async def test_jsonpath_complex_nested(client, mock_rpc):
     """Test JSON complexe imbriqué."""
-    complex_data = {
-        "users": [
-            {"id": 1, "profile": {"name": "Alice", "roles": ["admin", "user"]}},
-            {"id": 2, "profile": {"name": "Bob", "roles": ["user"]}}
-        ]
-    }
     
     mock_rpc.make_rpc_call = AsyncMock(return_value={
         "results": ["Alice", "Bob"]
@@ -300,8 +290,6 @@ async def test_timeout_respected(client, mock_rpc):
 @pytest.mark.asyncio
 async def test_execution_time_tracking(client, mock_rpc):
     """Test tracking temps exécution."""
-    start_time = DateTime.now()
-    
     mock_rpc.make_rpc_call = AsyncMock(return_value={
         "results": ["result"]
     })

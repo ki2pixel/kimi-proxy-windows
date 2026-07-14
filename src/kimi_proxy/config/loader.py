@@ -88,7 +88,7 @@ def load_config(config_path: str | None = None) -> Dict[str, Any]:
             _config_cache = _expand_env_vars(raw_config)
     except ImportError:
         try:
-            import tomli
+            import tomli  # type: ignore[import-not-found]
             with open(path, "rb") as f:
                 raw_config = tomli.load(f)
                 _config_cache = _expand_env_vars(raw_config)
@@ -197,9 +197,9 @@ def get_sanitizer_config(config: Dict[str, Any]) -> Dict[str, Any]:
         if stripped_tmp_dir and "${" not in stripped_tmp_dir:
             tmp_dir = stripped_tmp_dir
         else:
-            tmp_dir = DEFAULT_SANITIZER_CONFIG["tmp_dir"]
+            tmp_dir = str(DEFAULT_SANITIZER_CONFIG["tmp_dir"])
     else:
-        tmp_dir = DEFAULT_SANITIZER_CONFIG["tmp_dir"]
+        tmp_dir = str(DEFAULT_SANITIZER_CONFIG["tmp_dir"])
 
     return {
         "enabled": sanitizer_config.get("enabled", DEFAULT_SANITIZER_CONFIG["enabled"]),

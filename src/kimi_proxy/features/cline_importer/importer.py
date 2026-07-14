@@ -23,7 +23,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import List, Optional, TypedDict
 
-import aiofiles
+import aiofiles  # type: ignore[import-untyped]
 
 from ...core.database import (
     ClineTaskUsageInsert,

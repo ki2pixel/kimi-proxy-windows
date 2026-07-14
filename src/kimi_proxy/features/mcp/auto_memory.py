@@ -14,12 +14,11 @@ Patterns détectés:
 """
 import re
 import hashlib
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
 from datetime import datetime
 
 from ...core.tokens import count_tokens_tiktoken
-from ...core.database import get_db
 
 
 # Seuils de détection

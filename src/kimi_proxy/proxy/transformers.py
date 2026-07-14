@@ -1,7 +1,7 @@
 """
 Transformations de format entre OpenAI et autres APIs (Gemini, etc.).
 """
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, Optional
 
 
 def build_gemini_endpoint(
@@ -36,7 +36,7 @@ def convert_to_gemini_format(openai_body: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Body au format Gemini
     """
-    gemini_body = {}
+    gemini_body: Dict[str, Any] = {}
     
     # Convertit les messages
     if "messages" in openai_body:
@@ -79,7 +79,7 @@ def convert_from_gemini_response(gemini_response: Dict[str, Any]) -> Dict[str, A
     Returns:
         Réponse au format OpenAI
     """
-    openai_response = {
+    openai_response: Dict[str, Any] = {
         "id": "gemini-" + str(hash(str(gemini_response))),
         "object": "chat.completion",
         "created": 0,

@@ -74,12 +74,7 @@ def test_openai_models_endpoint(client: TestClient):
     assert isinstance(data.get("data"), list)
 
 
-def test_websocket_connection(client: TestClient):
-    """Test la connexion WebSocket (ASGI in-process)."""
-    with client.websocket_connect("/ws") as websocket:
-        data = websocket.receive_json()
-        assert isinstance(data, dict)
-        assert "type" in data
+
 
 
 def test_sanitizer_stats(client: TestClient):

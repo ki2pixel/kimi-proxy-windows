@@ -16,7 +16,6 @@ ATTENTION: Ces tests modifient les serveurs MCP réels!
 """
 import pytest
 import pytest_asyncio
-import asyncio
 import json
 import tempfile
 import os
@@ -64,7 +63,7 @@ def is_qdrant_available():
         import httpx
         response = httpx.get("http://localhost:6333/health", timeout=2.0)
         return response.status_code == 200
-    except:
+    except Exception:
         return False
 
 
@@ -74,7 +73,7 @@ def is_compression_available():
         import httpx
         response = httpx.get("http://localhost:8001/health", timeout=2.0)
         return response.status_code == 200
-    except:
+    except Exception:
         return False
 
 
@@ -84,7 +83,7 @@ def is_task_master_available():
         import httpx
         response = httpx.get("http://localhost:8002/health", timeout=2.0)
         return response.status_code == 200
-    except:
+    except Exception:
         return False
 
 
@@ -94,27 +93,55 @@ def is_sequential_thinking_available():
         import httpx
         response = httpx.get("http://localhost:8003/health", timeout=2.0)
         return response.status_code == 200
-    except:
+    except Exception:
         return False
 
 
 def is_fast_filesystem_available():
-    """Vérifie si Fast Filesystem MCP est disponible."""
+    """Vérifie si Fast Filesystem MCP est disponible et supporte fast_write_file."""
     try:
         import httpx
-        response = httpx.get("http://localhost:8004/health", timeout=2.0)
-        return response.status_code == 200
-    except:
+        # Vérifie d'abord l'endpoint health
+        response = httpx.get("http://localhost:8004/health", timeout=1.0)
+        if response.status_code != 200:
+            return False
+        # Vérifie si la méthode fast_write_file est supportée
+        payload = {
+            "jsonrpc": "2.0",
+            "method": "tools/list",
+            "params": {},
+            "id": 1
+        }
+        res = httpx.post("http://localhost:8004", json=payload, timeout=2.0)
+        if res.status_code == 200:
+            data = res.json()
+            tools = [t.get("name") for t in data.get("result", {}).get("tools", [])]
+            return "fast_write_file" in tools
+        return False
+    except Exception:
         return False
 
 
 def is_json_query_available():
-    """Vérifie si JSON Query MCP est disponible."""
+    """Vérifie si JSON Query MCP est disponible et supporte json_query_search_keys."""
     try:
         import httpx
-        response = httpx.get("http://localhost:8005/health", timeout=2.0)
-        return response.status_code == 200
-    except:
+        response = httpx.get("http://localhost:8005/health", timeout=1.0)
+        if response.status_code != 200:
+            return False
+        payload = {
+            "jsonrpc": "2.0",
+            "method": "tools/list",
+            "params": {},
+            "id": 1
+        }
+        res = httpx.post("http://localhost:8005", json=payload, timeout=2.0)
+        if res.status_code == 200:
+            data = res.json()
+            tools = [t.get("name") for t in data.get("result", {}).get("tools", [])]
+            return "json_query_search_keys" in tools
+        return False
+    except Exception:
         return False
 
 
@@ -136,7 +163,7 @@ def docker_available():
         import subprocess
         subprocess.check_output(["docker", "--version"], text=True)
         return True
-    except:
+    except Exception:
         return False
 
 
@@ -232,7 +259,7 @@ Non-Functional:
         if len(tasks) > 0:
             # Étape 3: Expansion première tâche
             first_task = tasks[0]
-            expanded = await client.expand_task(
+            await client.expand_task(
                 task_id=first_task.id,
                 num_subtasks=5,
                 prompt="Focus on FastAPI implementation with MCP"
@@ -276,7 +303,7 @@ async def test_e2e_filesystem_cran_paths(real_mcp_client):
         # Verify append
         read_result2 = await client.fast_read_file(test_file)
         assert "Append line" in read_result2.content
-        print(f"✅ Append verified")
+        print("✅ Append verified")
         
         # Navigate (list directory)
         list_result = await client.fast_list_directory(test_dir)
@@ -439,7 +466,7 @@ async def test_e2e_performance_latency(real_mcp_client):
         details = ", ".join(f"{name}={ms:.1f}ms" for name, ms in slow_servers.items())
         pytest.skip(f"Latence environnementale élevée détectée: {details}")
 
-    assert all(l < 1000 for l in latencies.values()), "Un serveur a une latence >1s"
+    assert all(latency < 1000 for latency in latencies.values()), "Un serveur a une latence >1s"
 
 
 if __name__ == "__main__":

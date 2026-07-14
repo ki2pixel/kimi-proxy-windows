@@ -3,7 +3,6 @@ Routes API pour la compaction (Phase 2 Fonctionnalités Utilisateur).
 """
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
-from typing import List, Dict, Any
 
 from ...features.compaction import (
     SimpleCompaction,
@@ -16,19 +15,16 @@ from ...features.compaction import (
 )
 from ...features.compaction.auto_trigger import (
     get_auto_trigger,
-    AutoTriggerConfig,
 )
 from ...core.database import (
     get_session_by_id,
     get_active_session,
     get_session_total_tokens,
     update_session_auto_compaction,
-    update_session_auto_threshold,
-    get_session_compaction_state,
+    get_recent_metrics,
 )
 from ...config.display import get_max_context_for_session
 from ...config.loader import get_config
-from ...services.websocket_manager import get_connection_manager
 
 router = APIRouter()
 
@@ -38,11 +34,11 @@ async def api_compact_session(session_id: int, request: Request):
     """
     Endpoint pour compacter manuellement l'historique d'une session.
     Déclenche une compaction avec préservation des messages récents.
-    
+
     Args:
         session_id: ID de la session à compacter
         request: Requête avec options optionnelles
-        
+
     Returns:
         Résultat de la compaction
     """
@@ -50,7 +46,7 @@ async def api_compact_session(session_id: int, request: Request):
     data = await request.json() if await request.body() else {}
     preserve_messages = data.get("preserve_messages", 2)
     force = data.get("force", False)
-    
+
     # Vérifie la session
     session = get_session_by_id(session_id)
     if not session:
@@ -58,10 +54,10 @@ async def api_compact_session(session_id: int, request: Request):
             status_code=404,
             content={"error": "Session non trouvée", "session_id": session_id}
         )
-    
+
     # Récupère les métriques récentes pour construire des messages de test
     recent_metrics = get_recent_metrics(session_id, limit=50)
-    
+
     # Construit une simulation de messages à partir des métriques
     messages = []
     for metric in recent_metrics:
@@ -71,10 +67,10 @@ async def api_compact_session(session_id: int, request: Request):
         })
         if metric.get("completion_tokens", 0) > 0:
             messages.append({
-                "role": "assistant", 
+                "role": "assistant",
                 "content": "Réponse de l'assistant..."
             })
-    
+
     # Si pas assez de messages, utilise des messages de test
     if len(messages) < 6:
         messages = [
@@ -90,15 +86,15 @@ async def api_compact_session(session_id: int, request: Request):
             {"role": "user", "content": "No, that's all for now."}
         ]
         print(f"[DEBUG] Using test messages for compaction: {len(messages)} messages")
-    
+
     # Crée le compacteur
     config = CompactionConfig(max_preserved_messages=preserve_messages)
     compactor = SimpleCompaction(config)
-    
+
     # Vérifie si la compaction est nécessaire
     should_compact, reason = compactor.should_compact(messages)
     print(f"[DEBUG] Compaction check: should_compact={should_compact}, reason={reason}, force={force}")
-    
+
     if not should_compact and not force:
         return {
             "success": False,
@@ -106,37 +102,23 @@ async def api_compact_session(session_id: int, request: Request):
             "session_id": session_id,
             "reason": reason
         }
-    
+
     # Exécute la compaction
     print(f"[DEBUG] Executing compaction with {len(messages)} messages")
     result = compactor.compact(messages, session_id=session_id)
     print(f"[DEBUG] Compaction result: compacted={result.compacted}, reason={getattr(result, 'reason', 'N/A')}")
-    
+
     if result.compacted:
-        print(f"[DEBUG] Persisting compaction result...")
+        print("[DEBUG] Persisting compaction result...")
         # Persiste le résultat
         await persist_compaction_result(result, trigger_reason="manual")
-        print(f"[DEBUG] Compaction persisted successfully")
+        print("[DEBUG] Compaction persisted successfully")
         # Persiste le résultat
         await persist_compaction_result(result, trigger_reason="manual")
-        
+
         # Notifie via WebSocket
-        try:
-            manager = get_connection_manager()
-            await manager.broadcast({
-                "type": "compaction_event",
-                "session_id": session_id,
-                "compaction": {
-                    "original_tokens": result.original_tokens,
-                    "compacted_tokens": result.compacted_tokens,
-                    "tokens_saved": result.tokens_saved,
-                    "compaction_ratio": result.compaction_ratio,
-                    "trigger_reason": "manual"
-                }
-            })
-        except Exception as e:
-            print(f"⚠️ Erreur WebSocket compaction: {e}")
-        
+        pass
+
         return {
             "success": True,
             "message": f"Compaction réussie: {result.tokens_saved} tokens économisés",
@@ -157,10 +139,10 @@ async def api_compact_session(session_id: int, request: Request):
 async def api_get_session_compaction_stats(session_id: int):
     """
     Retourne les statistiques de compaction d'une session.
-    
+
     Args:
         session_id: ID de la session
-        
+
     Returns:
         Statistiques complètes de compaction
     """
@@ -170,16 +152,16 @@ async def api_get_session_compaction_stats(session_id: int):
             status_code=404,
             content={"error": "Session non trouvée", "session_id": session_id}
         )
-    
+
     # Récupère les stats de compaction
     compaction_stats = get_session_compaction_stats(session_id)
-    
+
     # Récupère les infos de contexte actuel
     config = get_config()
     models = config.get("models", {})
     session_totals = get_session_total_tokens(session_id)
     max_context = get_max_context_for_session(session, models)
-    
+
     # Pour le seuil de compaction, utiliser les tokens cumulés, pas juste la dernière requête
     try:
         from ...core.database import get_session_cumulative_tokens
@@ -194,18 +176,18 @@ async def api_get_session_compaction_stats(session_id: int):
             print(f"[DEBUG] Using hardcoded value: {total_tokens_for_threshold}")
         else:
             total_tokens_for_threshold = session_totals["total_tokens"]
-    
+
     reserved = session.get("reserved_tokens", 0) or 0
-    
+
     # Calcule les métriques de contexte
     percentage = (total_tokens_for_threshold / max_context * 100) if max_context > 0 else 0
     percentage_with_reserved = ((total_tokens_for_threshold + reserved) / max_context * 100) if max_context > 0 else 0
-    
+
     # Détermine si la compaction est recommandée
     compaction_config = config.get("compaction", {})
     threshold = compaction_config.get("threshold_percentage", 80)
     compaction_ready = percentage >= threshold
-    
+
     return {
         "session_id": session_id,
         "compaction": compaction_stats,
@@ -225,20 +207,20 @@ async def api_get_session_compaction_stats(session_id: int):
 async def api_get_global_compaction_stats():
     """
     Retourne les statistiques globales de compaction.
-    
+
     Returns:
         Statistiques globales et configuration
     """
     stats = get_all_compaction_stats()
     config = get_config()
     compaction_config = config.get("compaction", {})
-    
+
     # Active session
     active = get_active_session()
     active_compaction = None
     if active:
         active_compaction = get_session_compaction_stats(active["id"])
-    
+
     return {
         "global": stats,
         "config": {
@@ -255,11 +237,11 @@ async def api_get_global_compaction_stats():
 async def api_get_compaction_history(session_id: int, limit: int = 50):
     """
     Retourne l'historique des compactions d'une session.
-    
+
     Args:
         session_id: ID de la session
         limit: Nombre maximum d'entrées
-        
+
     Returns:
         Historique des compactions avec cumuls
     """
@@ -269,9 +251,9 @@ async def api_get_compaction_history(session_id: int, limit: int = 50):
             status_code=404,
             content={"error": "Session non trouvée", "session_id": session_id}
         )
-    
+
     timeline = get_compaction_timeline(session_id, limit)
-    
+
     return {
         "session_id": session_id,
         "history": timeline,
@@ -283,38 +265,30 @@ async def api_get_compaction_history(session_id: int, limit: int = 50):
 async def api_set_reserved_tokens(session_id: int, request: Request):
     """
     Configure les tokens réservés pour une session.
-    
+
     Args:
         session_id: ID de la session
         request: Requête avec reserved_tokens
-        
+
     Returns:
         Confirmation de la mise à jour
     """
     data = await request.json()
     reserved_tokens = data.get("reserved_tokens", 0)
-    
+
     session = get_session_by_id(session_id)
     if not session:
         return JSONResponse(
             status_code=404,
             content={"error": "Session non trouvée", "session_id": session_id}
         )
-    
+
     success = set_session_reserved_tokens(session_id, reserved_tokens)
-    
+
     if success:
         # Diffuse la mise à jour
-        try:
-            manager = get_connection_manager()
-            await manager.broadcast({
-                "type": "reserved_tokens_updated",
-                "session_id": session_id,
-                "reserved_tokens": reserved_tokens
-            })
-        except Exception as e:
-            print(f"⚠️ Erreur broadcast WebSocket: {e}")
-        
+        pass
+
         return {
             "success": True,
             "session_id": session_id,
@@ -333,37 +307,37 @@ async def api_simulate_compaction(session_id: int, request: Request):
     """
     Simule une compaction sans l'appliquer réellement.
     Utile pour estimer les gains potentiels.
-    
+
     Args:
         session_id: ID de la session
         request: Requête avec messages à simuler
-        
+
     Returns:
         Résultat simulé de la compaction
     """
     data = await request.json() if await request.body() else {}
     messages = data.get("messages", [])
     preserve_messages = data.get("preserve_messages", 2)
-    
+
     session = get_session_by_id(session_id)
     if not session:
         return JSONResponse(
             status_code=404,
             content={"error": "Session non trouvée", "session_id": session_id}
         )
-    
+
     if not messages:
         return JSONResponse(
             status_code=400,
             content={"error": "Aucun message fourni pour la simulation"}
         )
-    
+
     # Crée le compacteur et simule
     config = CompactionConfig(max_preserved_messages=preserve_messages)
     compactor = SimpleCompaction(config)
-    
+
     result = compactor.compact(messages, session_id=session_id)
-    
+
     return {
         "simulated": True,
         "result": result.to_dict()
@@ -375,10 +349,10 @@ async def api_get_compaction_preview(session_id: int):
     """
     Retourne un aperçu de ce que ferait une compaction sur la session actuelle.
     Utilisé pour afficher le modal de confirmation avant compaction.
-    
+
     Args:
         session_id: ID de la session
-        
+
     Returns:
         Aperçu détaillé avec estimation des tokens économisés
     """
@@ -388,11 +362,11 @@ async def api_get_compaction_preview(session_id: int):
             status_code=404,
             content={"error": "Session non trouvée", "session_id": session_id}
         )
-    
+
     # Récupère les métriques récentes pour simuler
     from ...core.database import get_recent_metrics
     recent_metrics = get_recent_metrics(session_id, limit=50)
-    
+
     # Construit une simulation de messages à partir des métriques
     messages = []
     for metric in recent_metrics:
@@ -405,7 +379,7 @@ async def api_get_compaction_preview(session_id: int):
                 "role": "assistant",
                 "content": "Réponse de l'assistant..."
             })
-    
+
     # Si pas assez de messages, retourne une erreur informative
     if len(messages) < 6:
         return {
@@ -415,7 +389,7 @@ async def api_get_compaction_preview(session_id: int):
             "current_messages": len(messages),
             "min_required": 6
         }
-    
+
     # Simule la compaction
     config = CompactionConfig()
     compactor = SimpleCompaction(config)
@@ -435,7 +409,7 @@ async def api_get_compaction_preview(session_id: int):
         current_tokens = None
 
     should_compact, reason = compactor.should_compact(messages, current_tokens=current_tokens)
-    
+
     if not should_compact:
         return {
             "can_compact": False,
@@ -443,14 +417,14 @@ async def api_get_compaction_preview(session_id: int):
             "message": f"Compaction non nécessaire: {reason}",
             "current_messages": len(messages)
         }
-    
+
     # Exécute la simulation
     result = compactor.compact(messages, session_id=session_id)
-    
+
     # Récupère la config pour le preview
     ui_config = get_config().get("compaction", {}).get("preview", {})
     preview_count = ui_config.get("preview_messages_count", 5)
-    
+
     # Construit le preview des messages
     messages_preview = []
     for msg in messages[:preview_count]:
@@ -463,7 +437,7 @@ async def api_get_compaction_preview(session_id: int):
             "preview": preview,
             "full_length": len(content)
         })
-    
+
     return {
         "can_compact": True,
         "session_id": session_id,
@@ -491,39 +465,30 @@ async def api_get_compaction_preview(session_id: int):
 async def api_toggle_auto_compaction(session_id: int, request: Request):
     """
     Active ou désactive l'auto-compaction pour une session.
-    
+
     Args:
         session_id: ID de la session
         request: Requête avec enabled (bool)
-        
+
     Returns:
         Nouvel état de l'auto-compaction
     """
     data = await request.json()
     enabled = data.get("enabled", True)
-    
+
     session = get_session_by_id(session_id)
     if not session:
         return JSONResponse(
             status_code=404,
             content={"error": "Session non trouvée", "session_id": session_id}
         )
-    
+
     success = update_session_auto_compaction(session_id, enabled)
-    
+
     if success:
         # Diffuse la mise à jour
-        try:
-            manager = get_connection_manager()
-            await manager.broadcast({
-                "type": "auto_compaction_toggled",
-                "session_id": session_id,
-                "enabled": enabled,
-                "timestamp": datetime.now().isoformat()
-            })
-        except Exception as e:
-            print(f"⚠️ Erreur broadcast WebSocket: {e}")
-        
+        pass
+
         return {
             "success": True,
             "session_id": session_id,
@@ -541,10 +506,10 @@ async def api_toggle_auto_compaction(session_id: int, request: Request):
 async def api_get_auto_compaction_status(session_id: int):
     """
     Retourne le statut complet de l'auto-compaction pour une session.
-    
+
     Args:
         session_id: ID de la session
-        
+
     Returns:
         Statut détaillé incluant cooldown et compteurs
     """
@@ -554,10 +519,10 @@ async def api_get_auto_compaction_status(session_id: int):
             status_code=404,
             content={"error": "Session non trouvée", "session_id": session_id}
         )
-    
+
     trigger = get_auto_trigger()
     status = trigger.get_status(session_id)
-    
+
     # Récupère les infos de contexte actuel
     try:
         from ...core.database import get_session_cumulative_tokens
@@ -565,17 +530,17 @@ async def api_get_auto_compaction_status(session_id: int):
         current_tokens = cumulative_totals["total_tokens"]
     except Exception as e:
         print(f"[DEBUG] Auto-status API: Error getting cumulative tokens: {e}")
-        current_tokens = totals["total_tokens"]
-    
+        current_tokens = session.get("estimated_tokens", 0)
+
     config = get_config()
     models = config.get("models", {})
     max_context = get_max_context_for_session(session, models)
-    
+
     usage_ratio = current_tokens / max_context if max_context > 0 else 0
-    
+
     # Vérifie si une alerte est nécessaire
     alert = trigger.should_warn_threshold(session_id, current_tokens, max_context)
-    
+
     return {
         "session_id": session_id,
         "status": status,
@@ -593,14 +558,14 @@ async def api_get_auto_compaction_status(session_id: int):
 async def api_get_compaction_ui_config():
     """
     Retourne la configuration UI pour la compaction.
-    
+
     Returns:
         Configuration des boutons, tooltips, etc.
     """
     config = get_config()
     compaction = config.get("compaction", {})
     ui = compaction.get("ui", {})
-    
+
     return {
         "show_compact_button": ui.get("show_compact_button", True),
         "manual_button_threshold": ui.get("manual_button_threshold", 70),
@@ -616,10 +581,10 @@ async def api_get_compaction_ui_config():
 async def api_get_compaction_history_chart(session_id: int):
     """
     Retourne les données formatées pour le graphique d'historique de compaction.
-    
+
     Args:
         session_id: ID de la session
-        
+
     Returns:
         Données formatées pour Chart.js
     """
@@ -629,22 +594,22 @@ async def api_get_compaction_history_chart(session_id: int):
             status_code=404,
             content={"error": "Session non trouvée", "session_id": session_id}
         )
-    
+
     history = get_compaction_timeline(session_id, limit=50)
-    
+
     if not history:
         return {
             "session_id": session_id,
             "labels": [],
             "datasets": []
         }
-    
+
     # Formate pour Chart.js
     labels = []
     tokens_saved = []
     cumulative_saved = []
     compaction_ratios = []
-    
+
     running_total = 0
     for entry in reversed(history):  # Du plus ancien au plus récent
         timestamp = entry.get("timestamp", "")
@@ -653,16 +618,16 @@ async def api_get_compaction_history_chart(session_id: int):
             from datetime import datetime
             dt = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
             label = dt.strftime("%H:%M")
-        except:
+        except Exception:
             label = timestamp[:5] if timestamp else "?"
-        
+
         labels.append(label)
         saved = entry.get("tokens_saved", 0)
         tokens_saved.append(saved)
         running_total += saved
         cumulative_saved.append(running_total)
         compaction_ratios.append(entry.get("compaction_ratio", 0))
-    
+
     return {
         "session_id": session_id,
         "labels": labels,
@@ -695,6 +660,3 @@ async def api_get_compaction_history_chart(session_id: int):
             }
         ]
     }
-
-
-from datetime import datetime

@@ -26,12 +26,11 @@ async def test_streaming_read_error_handled():
         raise httpx.ReadError("Connection reset by peer")
     
     response.aiter_bytes = MagicMock(return_value=failing_stream())
-    manager = AsyncMock()
     models = {"test-model": {"max_context_size": 32768}}
     
-    # Mock _broadcast_token_update pour éviter les dépendances DB
-    with patch('kimi_proxy.proxy.stream._broadcast_token_update') as mock_broadcast:
-        mock_broadcast.return_value = None
+    # Mock _process_token_update pour éviter les dépendances DB
+    with patch('kimi_proxy.proxy.stream._process_token_update') as mock_process:
+        mock_process.return_value = None
         
         chunks = []
         try:
@@ -40,8 +39,7 @@ async def test_streaming_read_error_handled():
                 session_id=1,
                 metric_id=1,
                 provider_type="kimi",
-                models=models,
-                manager=manager
+                models=models
             ):
                 chunks.append(chunk)
         except Exception as e:
@@ -66,11 +64,10 @@ async def test_streaming_timeout_handled():
         raise httpx.TimeoutException("Read timeout")
     
     response.aiter_bytes = MagicMock(return_value=timeout_stream())
-    manager = AsyncMock()
     models = {"test-model": {"max_context_size": 32768}}
     
-    with patch('kimi_proxy.proxy.stream._broadcast_token_update') as mock_broadcast:
-        mock_broadcast.return_value = None
+    with patch('kimi_proxy.proxy.stream._process_token_update') as mock_process:
+        mock_process.return_value = None
         
         chunks = []
         async for chunk in stream_generator(
@@ -78,8 +75,7 @@ async def test_streaming_timeout_handled():
             session_id=1,
             metric_id=1,
             provider_type="kimi",
-            models=models,
-            manager=manager
+            models=models
         ):
             chunks.append(chunk)
         
@@ -99,30 +95,22 @@ async def test_streaming_extracts_partial_tokens():
         raise httpx.ReadError("Connection lost")
     
     response.aiter_bytes = MagicMock(return_value=partial_stream())
-    manager = AsyncMock()
     models = {"test-model": {"max_context_size": 32768}}
     
-    with patch('kimi_proxy.proxy.stream._broadcast_token_update') as mock_broadcast:
-        mock_broadcast.return_value = None
+    with patch('kimi_proxy.proxy.stream._process_token_update') as mock_process:
+        mock_process.return_value = None
         
         async for _ in stream_generator(
             response,
             session_id=1,
             metric_id=1,
             provider_type="kimi",
-            models=models,
-            manager=manager
+            models=models
         ):
             pass
         
-        # Vérifie que le broadcast de tokens a été fait
-        token_broadcasts = [
-            c for c in manager.broadcast.call_args_list 
-            if c[0][0].get("type") == "metric_updated"
-        ]
-        # Au moins un broadcast (les tokens partiels) - mais mocké ici
-        # Donc on vérifie juste que le générateur termine sans erreur
-        assert True
+        # Vérifie que la mise à jour de tokens a été déclenchée
+        mock_process.assert_called_once()
 
 
 async def test_client_retry_on_read_error():

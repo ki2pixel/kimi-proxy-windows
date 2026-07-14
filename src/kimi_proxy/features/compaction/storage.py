@@ -1,7 +1,7 @@
 """
 Stockage et persistance pour les opérations de compaction.
 """
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 
 from ...core.database import (
     save_compaction_history,
@@ -10,7 +10,6 @@ from ...core.database import (
     get_session_compaction_state,
     update_session_reserved_tokens,
 )
-from ...services.websocket_manager import get_connection_manager
 from .simple_compaction import CompactionResult
 
 
@@ -40,44 +39,9 @@ async def persist_compaction_result(
         trigger_reason=trigger_reason
     )
     
-    # Diffuse l'événement via WebSocket
-    await _broadcast_compaction_event(result, history_id)
+    # Diffuse l'événement via WebSocket supprimé (architecture middleware)
     
     return history_id
-
-
-async def _broadcast_compaction_event(
-    result: CompactionResult,
-    history_id: int
-):
-    """
-    Diffuse un événement de compaction via WebSocket.
-    
-    Args:
-        result: Résultat de la compaction
-        history_id: ID de l'historique créé
-    """
-    try:
-        manager = get_connection_manager()
-        await manager.broadcast({
-            "type": "compaction_event",
-            "session_id": result.session_id,
-            "timestamp": result.timestamp,
-            "history_id": history_id,
-            "compaction": {
-                "compacted": result.compacted,
-                "original_tokens": result.original_tokens,
-                "compacted_tokens": result.compacted_tokens,
-                "tokens_saved": result.tokens_saved,
-                "compaction_ratio": result.compaction_ratio,
-                "messages_before": result.messages_before,
-                "messages_after": result.messages_after,
-                "summarized_count": result.summarized_count
-            }
-        })
-    except Exception as e:
-        # Log l'erreur mais ne fait pas échouer l'opération
-        print(f"⚠️ Erreur broadcast WebSocket compaction: {e}")
 
 
 def get_session_compaction_stats(session_id: int) -> Dict[str, Any]:

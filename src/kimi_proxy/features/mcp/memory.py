@@ -10,10 +10,10 @@ Stockage:
 - SQLite: Méta-données et contenu fréquent/épisodique
 - Qdrant: Vecteurs sémantiques
 """
+import json
 import hashlib
 from datetime import datetime
-from typing import Dict, Any, List, Optional, Tuple
-from collections import defaultdict
+from typing import Dict, Any, List, Optional
 
 from ...core.database import get_db
 from ...core.tokens import count_tokens_text
@@ -104,7 +104,7 @@ class MemoryManager:
         existing = self._get_db_memory_by_hash(content_hash)
         if existing:
             # Incrémente le compteur d'accès
-            await self._increment_access(existing.id)
+            await self._increment_access(existing.id or 0)
             return existing
         
         # Stocke dans Qdrant si disponible et type sémantique
@@ -471,7 +471,6 @@ class MemoryManager:
             return self._get_db_memory_by_hash(self._generate_content_hash(compressed_content))
 
 
-import json  # Import manquant
 
 
 # Singleton

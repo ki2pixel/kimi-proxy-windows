@@ -186,14 +186,13 @@
       },
       "type": "stdio"
     },
-    "context7": {
-      "timeout": 60,
-      "url": "https://mcp.context7.com/mcp",
-      "headers": {
-        "Authorization": "hidden"
-      },
+    "docs-mcp-server": {
       "type": "sse",
-      "disabled": true
+      "url": "http://localhost:6280/sse",
+      "env": {
+        "GOOGLE_API_KEY": "hidden",
+        "DOCS_MCP_EMBEDDING_MODEL": "gemini:embedding-001"
+      }
     },
     "mcp-pruner": {
       "timeout": 60,

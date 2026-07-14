@@ -8,7 +8,7 @@ import zlib
 import base64
 import builtins
 from datetime import datetime
-from typing import Dict, Any, Optional
+from typing import Optional
 
 from ....core.tokens import count_tokens_text
 from ..base.rpc import MCPRPCClient
@@ -23,9 +23,9 @@ if TYPE_CHECKING:
 
 # Compat tests legacy qui utilisent base64/zlib sans imports explicites.
 if not hasattr(builtins, "base64"):
-    builtins.base64 = base64
+    setattr(builtins, "base64", base64)
 if not hasattr(builtins, "zlib"):
-    builtins.zlib = zlib
+    setattr(builtins, "zlib", zlib)
 
 
 class CompressionMCPClient:
@@ -64,7 +64,7 @@ class CompressionMCPClient:
             start_time = datetime.now()
             
             result = await self.rpc_client.make_rpc_call(
-                server_url=self.config.compression_url,
+                server_url=self.config.compression_url or "",
                 method="health",
                 params={},
                 timeout_ms=2000.0,
@@ -78,7 +78,7 @@ class CompressionMCPClient:
             self._status = MCPExternalServerStatus(
                 name="context-compression-mcp",
                 type="context-compression",
-                url=self.config.compression_url,
+                url=self.config.compression_url or "",
                 connected=connected,
                 last_check=datetime.now().isoformat(),
                 latency_ms=latency_ms,
@@ -90,7 +90,7 @@ class CompressionMCPClient:
             self._status = MCPExternalServerStatus(
                 name="context-compression-mcp",
                 type="context-compression",
-                url=self.config.compression_url,
+                url=self.config.compression_url or "",
                 connected=False,
                 last_check=datetime.now().isoformat(),
                 error_count=1,
@@ -125,7 +125,7 @@ class CompressionMCPClient:
         try:
             # Essaie d'abord le serveur MCP
             result = await self.rpc_client.make_rpc_call(
-                self.config.compression_url,
+                self.config.compression_url or "",
                 method="compress",
                 params={
                     "content": content,
@@ -191,7 +191,7 @@ class CompressionMCPClient:
         if "context_aware" in algorithm:
             try:
                 result = await self.rpc_client.make_rpc_call(
-                    self.config.compression_url,
+                    self.config.compression_url or "",
                     method="decompress",
                     params={
                         "compressed": compressed_data,
@@ -253,7 +253,7 @@ class CompressionMCPClient:
                 quality_score=0.7
             )
             
-        except Exception as e:
+        except Exception:
             # Dernier recours: retourne sans compression
             decompression_time = (datetime.now() - start_time).total_seconds() * 1000
             return MCPCompressionResult(

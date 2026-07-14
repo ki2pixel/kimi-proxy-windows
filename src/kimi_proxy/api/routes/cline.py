@@ -8,7 +8,7 @@
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Optional, Dict, Any
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
@@ -38,12 +38,12 @@ class ClineImportRequest(BaseModel):
 
 
 @router.post("/import")
-async def import_cline_ledger(request: ClineImportRequest) -> dict:
+async def import_cline_ledger(request: ClineImportRequest) -> Dict[str, Any]:
     """Importe le ledger local Cline (Solution 1)."""
     importer = ClineImporter()
 
     try:
-        return await importer.import_ledger(requested_path=request.path)
+        return dict(await importer.import_ledger(requested_path=request.path))
     except ClineLedgerPathError as e:
         raise HTTPException(status_code=400, detail=e.message)
     except ClineLedgerNotFoundError as e:
@@ -55,7 +55,7 @@ async def import_cline_ledger(request: ClineImportRequest) -> dict:
 
 
 @router.get("/usage")
-async def get_cline_usage(limit: int = 100, offset: int = 0) -> dict:
+async def get_cline_usage(limit: int = 100, offset: int = 0) -> Dict[str, Any]:
     """Retourne les métriques importées (payload minimal, safe)."""
     try:
         rows = list_cline_task_usage(limit=limit, offset=offset)

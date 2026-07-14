@@ -8,9 +8,7 @@ Vérifie:
 - Timeout et erreurs
 """
 import pytest
-import pytest_asyncio
-from unittest.mock import Mock, AsyncMock, patch
-from datetime import datetime
+from unittest.mock import Mock, AsyncMock
 
 from kimi_proxy.features.mcp.servers.sequential import SequentialThinkingMCPClient
 from kimi_proxy.features.mcp.base.config import MCPClientConfig
@@ -83,7 +81,7 @@ async def test_call_tool_basic(client, mock_rpc):
 @pytest.mark.asyncio
 async def test_call_tool_custom_params(client, mock_rpc):
     """Test appel avec paramètres custom."""
-    result = await client.call_tool(
+    await client.call_tool(
         thought="Custom thought",
         thought_number=3,
         total_thoughts=10

@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 
 # Compatibilité tests legacy (typo DateTime au lieu de datetime).
 if not hasattr(builtins, "DateTime"):
-    builtins.DateTime = datetime
+    setattr(builtins, "DateTime", datetime)
 
 
 class JsonQueryMCPClient:
@@ -40,7 +40,7 @@ class JsonQueryMCPClient:
         try:
             start_time = datetime.now()
             await self.rpc_client.make_rpc_call(
-                server_url=self.config.json_query_url,
+                server_url=self.config.json_query_url or "",
                 method="json_query_jsonpath",
                 params={"file_path": "dummy.json", "jsonpath": "$"},
                 timeout_ms=self.config.json_query_timeout_ms,
@@ -51,7 +51,7 @@ class JsonQueryMCPClient:
             self._status = MCPPhase4ServerStatus(
                 name="json-query-mcp",
                 type="json_query",
-                url=self.config.json_query_url,
+                url=self.config.json_query_url or "",
                 connected=True,
                 last_check=datetime.now().isoformat(),
                 latency_ms=latency_ms,
@@ -63,7 +63,7 @@ class JsonQueryMCPClient:
             self._status = MCPPhase4ServerStatus(
                 name="json-query-mcp",
                 type="json_query",
-                url=self.config.json_query_url,
+                url=self.config.json_query_url or "",
                 connected=False,
                 last_check=datetime.now().isoformat(),
                 error_count=1,
@@ -94,7 +94,7 @@ class JsonQueryMCPClient:
 
         start_time = datetime.now()
         result = await self.rpc_client.make_rpc_call(
-            server_url=self.config.json_query_url,
+            server_url=self.config.json_query_url or "",
             method=tool_name,
             params=params,
             timeout_ms=self.config.json_query_timeout_ms,

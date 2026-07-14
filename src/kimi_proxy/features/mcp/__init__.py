@@ -33,11 +33,13 @@ from .storage import (
 from .client import (
     MCPExternalClient,
     MCPClientConfig,
+    get_mcp_client,
+    reset_mcp_client,
+)
+from .base import (
     MCPClientError,
     MCPConnectionError,
     MCPTimeoutError,
-    get_mcp_client,
-    reset_mcp_client,
 )
 from .memory import (
     MemoryManager,
@@ -54,19 +56,7 @@ from .auto_memory import (
     detect_and_store_memories,
 )
 
-# Phase 4 - Imports conditionnels pour éviter les imports circulaires
-from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from kimi_proxy.core.models import (
-        ShrimpTaskMasterTask,
-        ShrimpTaskMasterStats,
-        SequentialThinkingStep,
-        FileSystemResult,
-        JsonQueryResult,
-        MCPToolCall,
-        MCPPhase4ServerStatus,
-    )
 
 __all__ = [
     # Phase 2

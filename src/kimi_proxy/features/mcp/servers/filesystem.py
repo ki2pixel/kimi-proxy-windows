@@ -56,7 +56,7 @@ class FileSystemMCPClient:
         try:
             start_time = datetime.now()
             result = await self.rpc_client.make_rpc_call(
-                server_url=self.config.fast_filesystem_url,
+                server_url=self.config.fast_filesystem_url or "",
                 method="fast_list_allowed_directories",
                 params={},
                 timeout_ms=self.config.fast_filesystem_timeout_ms,
@@ -68,7 +68,7 @@ class FileSystemMCPClient:
             self._status = MCPPhase4ServerStatus(
                 name="fast-filesystem-mcp",
                 type="fast_filesystem",
-                url=self.config.fast_filesystem_url,
+                url=self.config.fast_filesystem_url or "",
                 connected=connected,
                 last_check=datetime.now().isoformat(),
                 latency_ms=latency_ms,
@@ -80,7 +80,7 @@ class FileSystemMCPClient:
             self._status = MCPPhase4ServerStatus(
                 name="fast-filesystem-mcp",
                 type="fast_filesystem",
-                url=self.config.fast_filesystem_url,
+                url=self.config.fast_filesystem_url or "",
                 connected=False,
                 last_check=datetime.now().isoformat(),
                 error_count=1,
@@ -99,7 +99,7 @@ class FileSystemMCPClient:
             )
 
         result = await self.rpc_client.make_rpc_call(
-            self.config.fast_filesystem_url,
+            self.config.fast_filesystem_url or "",
             method=tool_name,
             params=params,
             timeout_ms=self.config.fast_filesystem_timeout_ms,

@@ -10,8 +10,6 @@ from kimi_proxy.core.models import (
     MCPCompressionResult,
     MCPExternalServerStatus,
     MCPPhase4ServerStatus,
-    ShrimpTaskMasterTask,
-    ShrimpTaskMasterStats,
     SequentialThinkingStep,
     FileSystemResult,
     JsonQueryResult,
@@ -20,7 +18,7 @@ from kimi_proxy.core.models import (
 from kimi_proxy.core.tokens import count_tokens_text
 from kimi_proxy.core.constants import MCP_MAX_RESPONSE_TOKENS, MCP_CHUNK_OVERLAP_TOKENS
 from .base.config import MCPClientConfig
-from .base.rpc import MCPRPCClient, MCPClientError, MCPConnectionError, MCPTimeoutError
+from .base.rpc import MCPRPCClient
 from .servers import (
     QdrantMCPClient,
     CompressionMCPClient,
@@ -150,7 +148,7 @@ class MCPExternalClient:
         self.filesystem = FileSystemMCPClient(self.config, self._rpc_client)
         self.json_query = JsonQueryMCPClient(self.config, self._rpc_client)
         
-        self._status_cache: Dict[str, MCPExternalServerStatus] = {}
+        self._status_cache: Dict[str, Any] = {}
         self._chunk_cache: Dict[str, Dict[str, Any]] = {}
         self._tool_cache: Dict[str, Dict[str, Any]] = {}
     
@@ -243,7 +241,7 @@ class MCPExternalClient:
                     algorithm="context_aware", 
                     target_ratio=0.7
                 )
-                if compressed_result.success and compressed_result.compressed_content:
+                if compressed_result.compressed_content:
                     print(f"[COMPRESSION] Contenu compresse: {len(content)} -> {len(compressed_result.compressed_content)} chars")
                     return f"[COMPRESSED CONTENT - {compressed_result.compression_ratio:.1%} saved]\n{compressed_result.compressed_content}"
         except Exception as e:
@@ -299,7 +297,11 @@ class MCPExternalClient:
     
     async def search_similar(self, query: str, limit: int = 5, score_threshold: float = 0.7) -> List[QdrantSearchResult]:
         """Recherche sémantique via Qdrant MCP."""
-        return await self.qdrant.search_similar(query, limit, score_threshold)
+        try:
+            return await self.qdrant.search_similar(query, limit, score_threshold)
+        except Exception as e:
+            print(f"⚠️  [MCP CLIENT] Erreur recherche sémantique: {e}")
+            return []
     
     async def store_memory_vector(self, content: str, memory_type: str = "episodic", metadata: Optional[Dict[str, Any]] = None) -> Optional[str]:
         """Stocke un vecteur mémoire dans Qdrant."""

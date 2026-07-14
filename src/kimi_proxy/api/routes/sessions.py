@@ -2,7 +2,6 @@
 Routes API pour la gestion des sessions.
 """
 from datetime import datetime
-from typing import Any, Dict
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
@@ -13,11 +12,10 @@ from ...core.database import (
     get_all_sessions,
     get_session_stats,
     set_active_session,
-    delete_session,
     delete_sessions_bulk,
     vacuum_database,
+    get_session_by_id,
 )
-from ...services.websocket_manager import get_connection_manager
 from ...config.loader import get_config
 from ...config.display import (
     get_provider_display_name,
@@ -49,12 +47,6 @@ async def api_create_session(request: Request):
     session_with_context = dict(session)
     session_with_context["max_context"] = max_context
     
-    # Broadcast via WebSocket
-    manager = get_connection_manager()
-    await manager.broadcast({
-        "type": "new_session",
-        "session": session_with_context
-    })
     
     return session_with_context
 
@@ -100,59 +92,6 @@ async def api_get_active_session():
         },
         "memory": memory_stats,
         **stats
-    }
-
-
-# ============================================================================
-# AUTO SESSION - Gestion du mode auto-création de sessions
-# ============================================================================
-
-@router.get("/auto-status")
-async def api_get_auto_session_status():
-    """Récupère le statut de l'auto-session pour la session active."""
-    from fastapi.responses import JSONResponse
-    
-    # Retourner une valeur par défaut pour éviter les erreurs lors de l'initialisation
-    # L'auto-session fonctionne indépendamment de cette route
-    session = get_active_session()
-    if not session:
-        return JSONResponse({"enabled": True, "session_id": None})
-    
-    try:
-        from ...core.auto_session import get_auto_session_status
-        enabled = get_auto_session_status(session["id"])
-        return JSONResponse({"enabled": enabled, "session_id": session["id"]})
-    except Exception as e:
-        # En cas d'erreur, retourner une valeur par défaut sécurisée
-        print(f"⚠️ Erreur récupération statut auto-session: {e}")
-        return JSONResponse({"enabled": True, "session_id": None})
-
-
-@router.post("/toggle-auto")
-async def api_toggle_auto_session(request: Request):
-    """Active ou désactive l'auto-session pour la session active."""
-    from ...core.auto_session import set_auto_session_status, get_auto_session_status
-    
-    data = await request.json()
-    enabled = data.get("enabled", True)
-    
-    session = get_active_session()
-    if not session:
-        return {"error": "Aucune session active"}
-    
-    set_auto_session_status(session["id"], enabled)
-    
-    # Broadcast via WebSocket
-    manager = get_connection_manager()
-    await manager.broadcast({
-        "type": "auto_session_toggled",
-        "session_id": session["id"],
-        "enabled": enabled
-    })
-    
-    return {
-        "enabled": get_auto_session_status(session["id"]),
-        "session_id": session["id"]
     }
 
 
@@ -237,13 +176,6 @@ async def api_activate_session(session_id: int):
     # Récupère la session activée
     new_active = get_active_session()
     
-    # Broadcast via WebSocket
-    manager = get_connection_manager()
-    await manager.broadcast({
-        "type": "session_activated",
-        "session_id": session_id,
-        "session": new_active
-    })
     
     return {
         "message": "Session activée",
@@ -259,7 +191,6 @@ async def api_activate_session(session_id: int):
 @router.get("/auto-status")
 async def api_get_auto_session_status():
     """Récupère le statut de l'auto-session pour la session active."""
-    from fastapi.responses import JSONResponse
     
     # Retourner une valeur par défaut pour éviter les erreurs lors de l'initialisation
     # L'auto-session fonctionne indépendamment de cette route
@@ -291,13 +222,6 @@ async def api_toggle_auto_session(request: Request):
     
     set_auto_session_status(session["id"], enabled)
     
-    # Broadcast via WebSocket
-    manager = get_connection_manager()
-    await manager.broadcast({
-        "type": "auto_session_toggled",
-        "session_id": session["id"],
-        "enabled": enabled
-    })
     
     return {
         "enabled": get_auto_session_status(session["id"]),
@@ -329,13 +253,6 @@ async def api_delete_sessions_bulk(request: Request):
     vacuum_result = vacuum_database()
     print(f"🧹 VACUUM automatique après suppression en bulk: {vacuum_result.get('message', 'Erreur')}")
     
-    # Broadcast via WebSocket
-    manager = get_connection_manager()
-    await manager.broadcast({
-        "type": "sessions_bulk_deleted",
-        "session_ids": session_ids,
-        "deleted_count": result["deleted_count"]
-    })
     
     return result
 

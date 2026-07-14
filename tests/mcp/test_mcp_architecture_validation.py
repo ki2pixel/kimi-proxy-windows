@@ -88,9 +88,7 @@ class TestMCPArchitecture:
         from kimi_proxy.features.mcp.base import (
             MCPClientConfig,
             MCPRPCClient,
-            MCPClientError,
-            MCPConnectionError,
-            MCPTimeoutError
+            MCPClientError
         )
         
         assert inspect.isclass(MCPClientConfig)
@@ -187,8 +185,8 @@ class TestMCPArchitecture:
         if not backup_file.exists():
             pytest.skip("Backup du fichier original non trouvé")
         
-        current_size = len(current_file.read_text())
-        backup_size = len(backup_file.read_text())
+        current_size = len(current_file.read_text(encoding="utf-8"))
+        len(backup_file.read_text(encoding="utf-8"))
         
         # Note : Le fichier actuel contient les imports et la facade
         # La réduction principale vient de la séparation en modules servers/
@@ -242,7 +240,6 @@ class TestMCPArchitecture:
             config_file = f.name
         
         try:
-            from kimi_proxy.config.loader import get_config
             # Simuler le chargement
             config = MCPClientConfig.from_toml(config_dict)
             
@@ -294,7 +291,6 @@ class TestMCPArchitecture:
     
     def test_documentation_in_client_files(self):
         """Vérifie que chaque client a une docstring descriptive."""
-        import inspect
         
         for module_name in [
             "kimi_proxy.features.mcp.servers.qdrant",
@@ -326,6 +322,8 @@ class TestMCPArchitecture:
 
 if __name__ == "__main__":
     # Vérifications manuelles
+    BOLD = "\033[1m"
+    RESET = "\033[0m"
     print(f"{BOLD}{sys.modules[__name__].__file__}{RESET}\n")
     
     print("Structure de l'architecture MCP:")

@@ -5,7 +5,7 @@ Pourquoi : Fournit les endpoints HTTP/WebSocket pour les fonctionnalités
 mémoire avancées du Kimi Proxy Dashboard
 """
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 import asyncio
@@ -13,8 +13,6 @@ import logging
 from datetime import datetime
 
 from ...core.database import get_db
-from ...core.tokens import count_tokens_tiktoken
-from ...services.websocket_manager import ConnectionManager, get_connection_manager
 
 logger = logging.getLogger(__name__)
 
@@ -70,9 +68,8 @@ class SimilarityResult(BaseModel):
 class MemoryService:
     """Service central pour les opérations mémoire avec données réelles et similarité MCP"""
     
-    def __init__(self, db, ws_manager: ConnectionManager):
+    def __init__(self, db):
         self.db = db
-        self.ws_manager = ws_manager
         self._qdrant_client = None
         self._mock_memories = self._generate_mock_memories()  # Fallback uniquement
     
@@ -216,7 +213,7 @@ class MemoryService:
                 ]
             else:  # semantic
                 # Regroupement sémantique basé sur les types de mémoires
-                types = {}
+                types: Dict[str, int] = {}
                 for m in memories:
                     t = m.get("type", "unknown")
                     types[t] = types.get(t, 0) + 1
@@ -289,14 +286,7 @@ class MemoryService:
             except Exception as e:
                 logger.warning(f"Erreur logging compression: {e}")
             
-            # Notifier les clients WebSocket
-            await self.ws_manager.broadcast({
-                "type": "memory_compression_completed",
-                "strategy": strategy,
-                "threshold": threshold,
-                "memories_processed": len(memories),
-                "timestamp": datetime.now().isoformat()
-            })
+            # Notifier les clients WebSocket (supprimé dans l'architecture MCP)
             
             return await self.preview_compression(strategy, threshold)
             
@@ -440,7 +430,7 @@ class MemoryService:
                 results.append(MemoryItem(**mem_copy))
         
         # Trie par score décroissant
-        results.sort(key=lambda x: x.similarity_score, reverse=True)
+        results.sort(key=lambda x: x.similarity_score or 0.0, reverse=True)
         
         # Limite les résultats
         return results[:limit]
@@ -545,8 +535,7 @@ class MemoryService:
 @router.get("/frequent", response_model=List[MemoryItem])
 async def get_frequent_memories(db=Depends(get_db)):
     """Récupère les mémoires fréquentes depuis la base de données"""
-    ws_manager = get_connection_manager()
-    service = MemoryService(db, ws_manager)
+    service = MemoryService(db)
     return await service.get_frequent_memories()
 
 @router.post("/compress/preview", response_model=CompressionResult)
@@ -556,8 +545,7 @@ async def preview_compression(
     db=Depends(get_db)
 ):
     """Prévisualise la compression mémoire"""
-    ws_manager = get_connection_manager()
-    service = MemoryService(db, ws_manager)
+    service = MemoryService(db)
     return await service.preview_compression(strategy, threshold)
 
 @router.post("/compress/execute", response_model=CompressionResult)
@@ -566,8 +554,7 @@ async def execute_compression(
     db=Depends(get_db)
 ):
     """Exécute la compression mémoire"""
-    ws_manager = get_connection_manager()
-    service = MemoryService(db, ws_manager)
+    service = MemoryService(db)
     return await service.execute_compression(
         request.strategy, 
         request.threshold, 
@@ -580,15 +567,13 @@ async def search_similar_memories(
     db=Depends(get_db)
 ):
     """Recherche des mémoires similaires"""
-    ws_manager = get_connection_manager()
-    service = MemoryService(db, ws_manager)
+    service = MemoryService(db)
     return await service.find_similar_memories(request)
 
 @router.get("/stats")
 async def get_memory_stats(db=Depends(get_db)):
     """Statistiques sur les mémoires"""
-    ws_manager = WebSocketManager()
-    service = MemoryService(db, ws_manager)
+    service = MemoryService(db)
     memories = await service.get_frequent_memories()
     
     total_tokens = sum(m.tokens for m in memories)
@@ -601,103 +586,3 @@ async def get_memory_stats(db=Depends(get_db)):
         "types": list(set(m.type for m in memories)),
         "last_updated": datetime.now().isoformat()
     }
-
-# ============================================================================
-# HANDLERS WEBSOCKET
-# ============================================================================
-
-async def handle_memory_compress_preview(websocket, data: Dict[str, Any]):
-    """Handler WebSocket pour preview compression"""
-    try:
-        db = get_db()
-        ws_manager = get_connection_manager()
-        service = MemoryService(db, ws_manager)
-        
-        result = await service.preview_compression(
-            data.get("strategy", "token"),
-            data.get("threshold", 0.3)
-        )
-        
-        await websocket.send_json({
-            "type": "memory_compress_preview_response",
-            "requestId": data.get("requestId"),
-            "result": result.dict()
-        })
-        
-    except Exception as e:
-        logger.error(f"Erreur WebSocket preview compression: {e}")
-        await websocket.send_json({
-            "type": "memory_compress_preview_response",
-            "requestId": data.get("requestId"),
-            "error": str(e)
-        })
-
-async def handle_memory_compress_execute(websocket, data: Dict[str, Any]):
-    """Handler WebSocket pour exécution compression"""
-    try:
-        db = get_db()
-        ws_manager = get_connection_manager()
-        service = MemoryService(db, ws_manager)
-        
-        result = await service.execute_compression(
-            data.get("strategy", "token"),
-            data.get("threshold", 0.3),
-            data.get("dryRun", False)
-        )
-        
-        await websocket.send_json({
-            "type": "memory_compress_result_response",
-            "requestId": data.get("requestId"),
-            "result": result.dict()
-        })
-        
-    except Exception as e:
-        logger.error(f"Erreur WebSocket exécution compression: {e}")
-        await websocket.send_json({
-            "type": "memory_compress_result_response",
-            "requestId": data.get("requestId"),
-            "error": str(e)
-        })
-
-import json
-from datetime import datetime
-
-# Helper pour sérialiser les objets datetime
-def serialize_datetime(obj):
-    if isinstance(obj, datetime):
-        return obj.isoformat()
-    raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
-
-async def handle_memory_similarity_search(websocket, data: Dict[str, Any]):
-    """Handler WebSocket pour recherche similarité"""
-    try:
-        db = get_db()
-        ws_manager = get_connection_manager()
-        service = MemoryService(db, ws_manager)
-        
-        request = SimilarityRequest(**data.get("payload", {}))
-        result = await service.find_similar_memories(request)
-        
-        # Sérialise correctement avec gestion des datetime
-        response_data = {
-            "type": "memory_similarity_result_response",
-            "requestId": data.get("requestId"),
-            "result": json.loads(json.dumps(result.dict() if hasattr(result, 'dict') else result, default=serialize_datetime))
-        }
-        
-        await websocket.send_json(response_data)
-        
-    except Exception as e:
-        logger.error(f"Erreur WebSocket recherche similarité: {e}")
-        await websocket.send_json({
-            "type": "memory_similarity_result_response",
-            "requestId": data.get("requestId"),
-            "error": str(e)
-        })
-
-# Export des handlers pour le WebSocket manager
-WEBSOCKET_HANDLERS = {
-    "memory_compress_preview": handle_memory_compress_preview,
-    "memory_compress_execute": handle_memory_compress_execute,
-    "memory_similarity_search": handle_memory_similarity_search,
-}

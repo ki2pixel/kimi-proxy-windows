@@ -8,9 +8,10 @@ Convention dans ce repo:
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from ..auth import verify_proxy_secret
 
 from ...config.display import get_model_display_name
 from ...config.loader import get_config
@@ -75,7 +76,7 @@ async def api_get_models_all() -> List[Dict[str, Any]]:
 
 
 @openai_router.get("/models")
-async def openai_models() -> Dict[str, Any]:
+async def openai_models(token: Optional[str] = Depends(verify_proxy_secret)) -> Dict[str, Any]:
     """Endpoint OpenAI-compatible minimal: GET /models."""
     config = get_config()
     models_config = config.get("models", {})

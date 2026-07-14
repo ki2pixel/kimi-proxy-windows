@@ -7,12 +7,10 @@ from fastapi.responses import JSONResponse
 from ...features.compression.storage import (
     compress_session_history,
     get_compression_stats,
-    get_session_compression_logs,
 )
 from ...core.database import get_session_by_id, get_session_total_tokens
 from ...config.display import get_max_context_for_session
 from ...config.loader import get_config
-from ...services.websocket_manager import get_connection_manager
 
 router = APIRouter()
 
@@ -68,21 +66,6 @@ async def api_compress_session(session_id: int, request: Request):
             )
         
         # Notifie via WebSocket
-        manager = get_connection_manager()
-        await manager.broadcast({
-            "type": "compression_event",
-            "session_id": session_id,
-            "timestamp": __import__('datetime').datetime.now().isoformat(),
-            "compression": {
-                "compressed": result.compressed,
-                "original_tokens": result.original_tokens,
-                "compressed_tokens": result.compressed_tokens,
-                "tokens_saved": result.tokens_saved,
-                "compression_ratio": result.compression_ratio,
-                "messages_before": result.messages_before,
-                "messages_after": result.messages_after
-            }
-        })
         
         return result.to_dict()
         

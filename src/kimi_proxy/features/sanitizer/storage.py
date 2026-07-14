@@ -52,8 +52,8 @@ def create_preview(content: str, max_length: int = 200) -> str:
 
 def save_masked_content(
     content: str,
-    tags: List[str] = None,
-    config: dict = None
+    tags: Optional[List[str]] = None,
+    config: Optional[Dict[str, Any]] = None
 ) -> Tuple[str, str, int]:
     """
     Sauvegarde le contenu masqué sur disque et en DB.

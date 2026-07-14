@@ -9,9 +9,7 @@ Valide:
 - Opérations batch
 """
 import pytest
-import pytest_asyncio
-from unittest.mock import Mock, AsyncMock, patch
-from datetime import datetime
+from unittest.mock import Mock, AsyncMock
 
 from kimi_proxy.features.mcp.servers.filesystem import FileSystemMCPClient
 from kimi_proxy.features.mcp.base.config import MCPClientConfig
@@ -135,7 +133,7 @@ async def test_read_file_with_line_count(client, mock_rpc):
         "bytes_affected": 16
     })
     
-    result = await client.read_file("/tmp/file.txt", line_count=10)
+    await client.read_file("/tmp/file.txt", line_count=10)
     
     args = mock_rpc.make_rpc_call.call_args
     assert args[1]["params"]["line_count"] == 10
@@ -158,7 +156,7 @@ async def test_write_file_helper(client, mock_rpc):
 @pytest.mark.asyncio
 async def test_write_file_overwrite(client, mock_rpc):
     """Test write_file overwrite (default)."""
-    result = await client.write_file("/tmp/output.txt", "New content", append=False)
+    await client.write_file("/tmp/output.txt", "New content", append=False)
     
     args = mock_rpc.make_rpc_call.call_args
     assert args[1]["params"]["append"] is False
@@ -167,7 +165,7 @@ async def test_write_file_overwrite(client, mock_rpc):
 @pytest.mark.asyncio
 async def test_search_code_helper(client, mock_rpc):
     """Test helper search_code."""
-    result = await client.search_code("/src", "TODO.*", max_results=50)
+    await client.search_code("/src", "TODO.*", max_results=50)
     
     args = mock_rpc.make_rpc_call.call_args
     params = args[1]["params"]
@@ -186,7 +184,7 @@ async def test_list_directory_helper(client, mock_rpc):
         "directories": ["dir1", "dir2"]
     })
     
-    result = await client.list_directory("/home", recursive=True)
+    await client.list_directory("/home", recursive=True)
     
     args = mock_rpc.make_rpc_call.call_args
     params = args[1]["params"]
@@ -292,7 +290,7 @@ async def test_get_directory_tree(client, mock_rpc):
         }
     })
     
-    result = await client.call_tool("fast_get_directory_tree", {
+    await client.call_tool("fast_get_directory_tree", {
         "path": "/src",
         "show_hidden": False,
         "include_files": True
@@ -310,7 +308,7 @@ async def test_get_disk_usage(client, mock_rpc):
         "usage_percent": 50
     })
     
-    result = await client.call_tool("fast_get_disk_usage", {"path": "/"})
+    await client.call_tool("fast_get_disk_usage", {"path": "/"})
 
 
 @pytest.mark.asyncio
@@ -323,7 +321,7 @@ async def test_find_large_files(client, mock_rpc):
         ]
     })
     
-    result = await client.call_tool("fast_find_large_files", {
+    await client.call_tool("fast_find_large_files", {
         "path": "/logs",
         "min_size": "100MB"
     })

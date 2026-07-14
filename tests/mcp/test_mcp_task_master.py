@@ -9,9 +9,7 @@ Valide:
 - Configuration projet
 """
 import pytest
-import pytest_asyncio
-from unittest.mock import Mock, AsyncMock, patch, call
-from datetime import datetime
+from unittest.mock import Mock, AsyncMock
 
 from kimi_proxy.features.mcp.servers.task_master import TaskMasterMCPClient
 from kimi_proxy.features.mcp.base.config import MCPClientConfig
@@ -91,7 +89,7 @@ async def test_call_tool_valid(client, mock_rpc):
     """Test appel outil valide."""
     mock_rpc.make_rpc_call = AsyncMock(return_value={"result": "ok"})
     
-    result = await client.call_tool("get_tasks", {"limit": 10})
+    await client.call_tool("get_tasks", {"limit": 10})
     
     mock_rpc.make_rpc_call.assert_called_once()
     args = mock_rpc.make_rpc_call.call_args
@@ -269,7 +267,7 @@ async def test_expand_task_no_prompt(client, mock_rpc):
     """Test expansion sans prompt."""
     mock_rpc.make_rpc_call = AsyncMock(return_value={})
     
-    result = await client.expand_task(task_id=1)
+    await client.expand_task(task_id=1)
     
     args = mock_rpc.make_rpc_call.call_args
     assert "prompt" not in args[1]["params"]
@@ -281,7 +279,7 @@ async def test_initialize_project(client, mock_rpc):
     """Test initialisation projet."""
     mock_rpc.make_rpc_call = AsyncMock(return_value={"initialized": True})
     
-    result = await client.initialize_project("/path/to/project")
+    await client.initialize_project("/path/to/project")
     
     args = mock_rpc.make_rpc_call.call_args
     assert args[1]["params"]["projectRoot"] == "/path/to/project"
@@ -294,7 +292,7 @@ async def test_set_task_status(client, mock_rpc):
     """Test mise à jour statut tâche."""
     mock_rpc.make_rpc_call = AsyncMock(return_value={"updated": True})
     
-    result = await client.set_task_status(1, "in-progress")
+    await client.set_task_status(1, "in-progress")
     
     args = mock_rpc.make_rpc_call.call_args
     assert args[1]["params"]["id"] == "1"
@@ -306,7 +304,7 @@ async def test_set_subtask_status(client, mock_rpc):
     """Test mise à jour statut sous-tâche."""
     mock_rpc.make_rpc_call = AsyncMock(return_value={"updated": True})
     
-    result = await client.set_task_status(1, "done", subtask_id="2")
+    await client.set_task_status(1, "done", subtask_id="2")
     
     args = mock_rpc.make_rpc_call.call_args
     assert args[1]["params"]["id"] == "1,2"

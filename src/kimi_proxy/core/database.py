@@ -3,7 +3,6 @@ Gestion de la base de données SQLite avec migrations.
 """
 import sqlite3
 from contextlib import contextmanager
-from pathlib import Path
 from typing import Generator, Optional, List, Dict, Any, TypedDict
 
 from .constants import DATABASE_FILE
@@ -28,7 +27,7 @@ class ClineTaskUsageRow(ClineTaskUsageInsert):
 
 
 @contextmanager
-def get_db() -> Generator[sqlite3.Row, None, None]:
+def get_db() -> Generator[sqlite3.Connection, None, None]:
     """
     Context manager pour les connexions DB.
     
@@ -412,7 +411,7 @@ def get_all_sessions() -> List[Dict[str, Any]]:
         return [dict(row) for row in cursor.fetchall()]
 
 
-def create_session(name: str, provider: str = "managed:kimi-code", model: str = None) -> Dict[str, Any]:
+def create_session(name: str, provider: str = "managed:kimi-code", model: Optional[str] = None) -> Dict[str, Any]:
     """Crée une nouvelle session et la rend active."""
     with get_db() as conn:
         cursor = conn.cursor()
@@ -512,7 +511,7 @@ def save_metric(
              is_estimated, source, memory_tokens, chat_tokens, memory_ratio)
         )
         conn.commit()
-        return cursor.lastrowid
+        return int(cursor.lastrowid) if cursor.lastrowid is not None else 0
 
 
 def update_metric_with_real_tokens(
@@ -785,7 +784,7 @@ def save_compaction_history(
         )
         
         conn.commit()
-        return history_id
+        return int(history_id) if history_id is not None else 0
 
 
 def get_compaction_history(session_id: int, limit: int = 50) -> List[Dict[str, Any]]:
@@ -1077,7 +1076,7 @@ def delete_sessions_bulk(session_ids: List[int]) -> Dict[str, Any]:
     Returns:
         Résumé des suppressions {success: bool, deleted_count: int, failed_ids: List[int]}
     """
-    results = {
+    results: Dict[str, Any] = {
         'success': True,
         'deleted_count': 0,
         'failed_ids': []
@@ -1217,6 +1216,9 @@ def get_cline_task_usage_count() -> int:
     return int(value) if value is not None else 0
 
 
+_last_vacuum: float = 0.0
+
+
 def vacuum_database() -> Dict[str, Any]:
     """
     Exécute VACUUM sur la base de données pour récupérer l'espace disque.
@@ -1227,17 +1229,14 @@ def vacuum_database() -> Dict[str, Any]:
     """
     import os
     import time
-    
-    # Cache pour éviter les VACUUM répétés (délai minimum de 30 secondes)
-    if not hasattr(vacuum_database, '_last_vacuum'):
-        vacuum_database._last_vacuum = 0
+    global _last_vacuum
     
     current_time = time.time()
-    if current_time - vacuum_database._last_vacuum < 30:  # 30 secondes minimum
+    if current_time - _last_vacuum < 30:  # 30 secondes minimum
         return {
             "message": "VACUUM ignoré (délai minimum non écoulé)",
             "skipped": True,
-            "next_available": vacuum_database._last_vacuum + 30
+            "next_available": _last_vacuum + 30
         }
     
     try:
@@ -1257,7 +1256,7 @@ def vacuum_database() -> Dict[str, Any]:
         conn.close()
         
         # Met à jour le cache
-        vacuum_database._last_vacuum = current_time
+        _last_vacuum = current_time
         
         # Récupère la taille après VACUUM
         size_after = os.path.getsize(DATABASE_FILE)

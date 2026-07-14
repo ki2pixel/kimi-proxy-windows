@@ -4,9 +4,7 @@ Tests d'intégration de la facade MCP.
 Vérifie la compatibilité ascendante, le singleton, et la délégation aux clients spécialisés.
 """
 import pytest
-import pytest_asyncio
 from unittest.mock import Mock, AsyncMock, patch
-from typing import Dict, Any
 
 from kimi_proxy.features.mcp.client import (
     MCPExternalClient,
@@ -177,7 +175,6 @@ async def test_sequential_delegation(config):
     client = MCPExternalClient(config)
     
     with patch.object(client.sequential, 'call_tool', new_callable=AsyncMock) as mock_call:
-        from kimi_proxy.core.models import SequentialThinkingStep
         mock_step = Mock(
             step_number=1,
             thought="Test thought",
@@ -199,7 +196,6 @@ async def test_filesystem_delegation(config):
     client = MCPExternalClient(config)
     
     with patch.object(client.filesystem, 'call_tool', new_callable=AsyncMock) as mock_call:
-        from kimi_proxy.core.models import FileSystemResult
         mock_result = Mock(
             success=True,
             path="/tmp/test",
@@ -221,7 +217,6 @@ async def test_json_query_delegation(config):
     client = MCPExternalClient(config)
     
     with patch.object(client.json_query, 'call_tool', new_callable=AsyncMock) as mock_call:
-        from kimi_proxy.core.models import JsonQueryResult
         mock_result = Mock(
             success=True,
             query="$.store.book",

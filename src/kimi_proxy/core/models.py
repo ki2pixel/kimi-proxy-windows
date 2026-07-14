@@ -2,7 +2,6 @@
 Dataclasses métier pour Kimi Proxy Dashboard.
 """
 from dataclasses import dataclass, field
-from datetime import datetime
 from typing import List, Optional, Dict, Any
 
 
@@ -593,7 +592,7 @@ class JsonQueryResult:
     success: bool = False
     query: str = ""
     file_path: str = ""
-    results: List[Dict[str, Any]] = field(default_factory=list)
+    results: List[Any] = field(default_factory=list)
     error: Optional[str] = None
     execution_time_ms: float = 0.0
     
@@ -677,4 +676,57 @@ class MCPPhase4ServerStatus:
             "capabilities": self.capabilities,
             "phase": self.phase,
             "tool_count": self.tools_count  # Alias pour compatibilité frontend
+        }
+
+
+# ============================================================================
+# LOG ORCHESTRATOR MODELS
+# ============================================================================
+
+@dataclass
+class AnalyticsSourceState:
+    """État runtime d'une source analytics multi-provider."""
+    source_id: str
+    source_kind: str
+    path: str
+    available: bool = False
+    healthy: bool = True
+    last_error: Optional[str] = None
+    last_event_at: Optional[str] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "source_id": self.source_id,
+            "source_kind": self.source_kind,
+            "path": self.path,
+            "available": self.available,
+            "healthy": self.healthy,
+            "last_error": self.last_error,
+            "last_event_at": self.last_event_at
+        }
+
+@dataclass
+class AnalyticsEvent:
+    """Événement analytics normalisé."""
+    source_id: str
+    source_kind: str
+    timestamp: str
+    metrics: TokenMetrics
+    provider: Optional[str] = None
+    model: Optional[str] = None
+    session_external_id: Optional[str] = None
+    preview: Optional[str] = None
+    severity: str = "info"
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "source_id": self.source_id,
+            "source_kind": self.source_kind,
+            "timestamp": self.timestamp,
+            "metrics": self.metrics.to_dict() if hasattr(self.metrics, 'to_dict') else self.metrics,
+            "provider": self.provider,
+            "model": self.model,
+            "session_external_id": self.session_external_id,
+            "preview": self.preview,
+            "severity": self.severity
         }

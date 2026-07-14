@@ -35,7 +35,7 @@ class SequentialThinkingMCPClient:
             self._status = MCPPhase4ServerStatus(
                 name="sequential-thinking-mcp",
                 type="sequential_thinking",
-                url=self.config.sequential_thinking_url,
+                url=self.config.sequential_thinking_url or "",
                 connected=True,
                 last_check=datetime.now().isoformat(),
                 latency_ms=latency_ms,
@@ -47,7 +47,7 @@ class SequentialThinkingMCPClient:
             self._status = MCPPhase4ServerStatus(
                 name="sequential-thinking-mcp",
                 type="sequential_thinking",
-                url=self.config.sequential_thinking_url,
+                url=self.config.sequential_thinking_url or "",
                 connected=False,
                 last_check=datetime.now().isoformat(),
                 error_count=1,
@@ -75,7 +75,7 @@ class SequentialThinkingMCPClient:
             params["available_mcp_tools"] = available_mcp_tools
 
         result = await self.rpc_client.make_rpc_call(
-            server_url=self.config.sequential_thinking_url,
+            server_url=self.config.sequential_thinking_url or "",
             method="sequentialthinking",
             params=params,
             timeout_ms=self.config.sequential_thinking_timeout_ms,

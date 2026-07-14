@@ -1,12 +1,13 @@
 """
 Exceptions personnalisées pour Kimi Proxy Dashboard.
 """
+from typing import Any, Dict, Optional
 
 
 class KimiProxyError(Exception):
     """Exception de base pour toutes les erreurs du proxy."""
     
-    def __init__(self, message: str, code: str = None, details: dict = None):
+    def __init__(self, message: str, code: Optional[str] = None, details: Optional[Dict[str, Any]] = None):
         super().__init__(message)
         self.message = message
         self.code = code or "unknown_error"
@@ -21,29 +22,32 @@ class KimiProxyError(Exception):
 class ConfigurationError(KimiProxyError):
     """Erreur de configuration (fichier manquant, valeur invalide)."""
     
-    def __init__(self, message: str, config_key: str = None):
+    def __init__(self, message: str, config_key: Optional[str] = None):
         super().__init__(
             message=message,
-            code="config_error",
-            details={"key": config_key} if config_key else {}
+            code="configuration_error",
+            details={"config_key": config_key} if config_key else {}
         )
 
 
 class ProviderError(KimiProxyError):
-    """Erreur liée à un provider (clé API manquante, URL invalide)."""
+    """Erreur retournée par le fournisseur d'API (OpenAI, Gemini, etc.)."""
     
-    def __init__(self, message: str, provider: str = None):
+    def __init__(self, message: str, provider: Optional[str] = None, status_code: Optional[int] = None):
         super().__init__(
             message=message,
             code="provider_error",
-            details={"provider": provider} if provider else {}
+            details={
+                "provider": provider,
+                "status_code": status_code
+            }
         )
 
 
 class DatabaseError(KimiProxyError):
-    """Erreur de base de données SQLite."""
+    """Erreur lors d'une opération en base de données."""
     
-    def __init__(self, message: str, operation: str = None):
+    def __init__(self, message: str, operation: Optional[str] = None):
         super().__init__(
             message=message,
             code="database_error",
@@ -54,7 +58,7 @@ class DatabaseError(KimiProxyError):
 class TokenizationError(KimiProxyError):
     """Erreur lors du comptage de tokens."""
     
-    def __init__(self, message: str, content_preview: str = None):
+    def __init__(self, message: str, content_preview: Optional[str] = None):
         details = {}
         if content_preview:
             details["preview"] = content_preview[:100]
@@ -68,7 +72,7 @@ class TokenizationError(KimiProxyError):
 class RateLimitError(KimiProxyError):
     """Erreur de rate limiting dépassé."""
     
-    def __init__(self, message: str, current_rpm: int = None, max_rpm: int = None):
+    def __init__(self, message: str, current_rpm: Optional[int] = None, max_rpm: Optional[int] = None):
         super().__init__(
             message=message,
             code="rate_limit_error",
@@ -82,7 +86,7 @@ class RateLimitError(KimiProxyError):
 class CompressionError(KimiProxyError):
     """Erreur lors de la compression d'historique."""
     
-    def __init__(self, message: str, session_id: int = None):
+    def __init__(self, message: str, session_id: Optional[int] = None):
         super().__init__(
             message=message,
             code="compression_error",
@@ -93,7 +97,7 @@ class CompressionError(KimiProxyError):
 class CompactionError(KimiProxyError):
     """Erreur lors de la compaction du contexte."""
     
-    def __init__(self, message: str, session_id: int = None):
+    def __init__(self, message: str, session_id: Optional[int] = None):
         super().__init__(
             message=message,
             code="compaction_error",
@@ -107,10 +111,10 @@ class StreamingError(KimiProxyError):
     def __init__(
         self, 
         message: str, 
-        provider: str = None,
-        error_type: str = None,
+        provider: Optional[str] = None,
+        error_type: Optional[str] = None,
         retry_count: int = 0,
-        details: dict = None
+        details: Optional[Dict[str, Any]] = None
     ):
         super().__init__(
             message=message,

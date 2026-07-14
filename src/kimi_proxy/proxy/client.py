@@ -6,7 +6,7 @@ Pourquoi cette complexité:
 - Le streaming nécessite des timeouts plus longs
 - Les retries doivent être intelligents (pas sur les 4xx)
 """
-from typing import Dict, Any, Optional, Callable
+from typing import Dict, Optional
 import asyncio
 
 import httpx
@@ -101,9 +101,7 @@ class ProxyClient:
                 
                 response = await client.send(request, stream=True)
                 
-                # Pourquoi on retourne client avec response: le stream
-                # a besoin que le client reste vivant
-                response._client_ref = client  # Hack pour garder référence
+                setattr(response, "_client_ref", client)  # Hack pour garder référence
                 return response
                 
             except (httpx.ReadError, httpx.ConnectError, httpx.TimeoutException) as e:

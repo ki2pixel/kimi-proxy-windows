@@ -1,7 +1,7 @@
 """Détection des balises MCP et contenus mémoire."""
 import re
-from typing import List, Dict, Any, Optional, Tuple
-from dataclasses import dataclass, field
+from typing import List, Dict, Any, Tuple
+from dataclasses import dataclass
 
 from ...core.constants import MCP_PATTERNS, MCP_MIN_MEMORY_TOKENS
 from ...core.tokens import count_tokens_text
@@ -51,7 +51,7 @@ class MCPDetector:
         Returns:
             Liste des segments détectés
         """
-        segments = []
+        segments: List[MemorySegment] = []
         
         if not content or not isinstance(content, str):
             return segments
@@ -95,7 +95,7 @@ class MCPDetector:
         Returns:
             Liste des segments d'outils Phase 4 détectés
         """
-        segments = []
+        segments: List[MemorySegment] = []
         
         if not content or not isinstance(content, str):
             return segments
@@ -178,7 +178,7 @@ def extract_phase4_tools(content: str, min_tokens: int = MCP_MIN_MEMORY_TOKENS) 
     segments = detector.detect_phase4_tools(content)
     return [s.to_dict() for s in segments]
 
-def get_detected_mcp_servers(content: str, min_tokens: int = MCP_MIN_MEMORY_TOKENS) -> Dict[str, List[str]]:
+def get_detected_mcp_servers(content: str, min_tokens: int = MCP_MIN_MEMORY_TOKENS) -> Dict[str, Any]:
     """
     Récupère tous les serveurs MCP détectés dans un message.
     

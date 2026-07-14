@@ -24,7 +24,8 @@ import time
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Literal
+from contextlib import asynccontextmanager
+from typing import Literal, Any
 
 import httpx
 from fastapi import FastAPI, Request
@@ -425,7 +426,7 @@ def _baseline_prune(
     pruned_lines = original_lines - len(keep)
     pruned_ratio = pruned_lines / original_lines if original_lines > 0 else 0.0
 
-    stats: JsonDict = {
+    stats = {
         "original_lines": original_lines,
         "kept_lines": len(keep),
         "pruned_lines": pruned_lines,
@@ -475,20 +476,19 @@ def create_app(*, config: MCPPrunerServerConfig | None = None) -> FastAPI:
 
     deepinfra_http_client: httpx.AsyncClient | None = None
 
-    app = FastAPI()
-
-    @app.on_event("startup")
-    async def _startup() -> None:
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
         nonlocal deepinfra_http_client
         # Client partagé (keep-alive) pour DeepInfra.
         deepinfra_http_client = httpx.AsyncClient(timeout=httpx.Timeout(30.0, connect=5.0))
+        try:
+            yield
+        finally:
+            if deepinfra_http_client is not None:
+                await deepinfra_http_client.aclose()
+                deepinfra_http_client = None
 
-    @app.on_event("shutdown")
-    async def _shutdown() -> None:
-        nonlocal deepinfra_http_client
-        if deepinfra_http_client is not None:
-            await deepinfra_http_client.aclose()
-            deepinfra_http_client = None
+    app = FastAPI(lifespan=lifespan)
 
     tools_list: list[JsonDict] = [
         {
@@ -703,7 +703,7 @@ async def _tool_prune_text(
     if len(text) > cfg.max_input_chars:
         # Fail-open: no-op + warning
         await store.put(prune_id, lines=text.splitlines())
-        payload = {
+        payload: dict[str, Any] = {
             "prune_id": prune_id,
             "pruned_text": text,
             "annotations": [],

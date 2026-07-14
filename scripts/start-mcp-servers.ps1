@@ -25,6 +25,9 @@ $FastFilesystemPidFile = Join-Path $McpRuntimeDir "mcp_fast_filesystem.pid"
 $JsonQueryPidFile = Join-Path $McpRuntimeDir "mcp_json_query.pid"
 $PrunerPidFile = Join-Path $McpRuntimeDir "mcp_pruner.pid"
 
+$DocsPort = 6280
+$DocsPidFile = Join-Path $McpRuntimeDir "docs_mcp_server.pid"
+
 function Write-Info([string]$Message) { Write-Host "[INFO] $Message" -ForegroundColor Cyan }
 function Write-Ok([string]$Message) { Write-Host "[OK]   $Message" -ForegroundColor Green }
 function Write-Warn([string]$Message) { Write-Host "[WARN] $Message" -ForegroundColor Yellow }
@@ -164,6 +167,43 @@ function Start-Pruner {
     }
 }
 
+function Start-DocsMcpServer {
+    Ensure-Venv
+    $existing = Get-LiveProcessByPidFile -PidFile $DocsPidFile
+    if ($null -ne $existing -and (Test-PortListening $DocsPort) -and (Wait-HttpHealth -Url "http://127.0.0.1:$DocsPort/health" -MaxWaitSeconds 3)) {
+        Write-Ok "Docs MCP Server already active on port $DocsPort"
+        return
+    }
+
+    $logFile = Join-Path $McpLogDir "docs_mcp_server.log"
+    $errFile = Join-Path $McpLogDir "docs_mcp_server.err.log"
+    $clineConfigPath = "C:\Users\kidpixel\.cline\data\settings\cline_mcp_settings.json"
+    $clineConfig = Get-Content $clineConfigPath | ConvertFrom-Json
+    $docsServer = $clineConfig.mcpServers."docs-mcp-server"
+    $env:GOOGLE_API_KEY = $docsServer.env.GOOGLE_API_KEY
+    $env:DOCS_MCP_EMBEDDING_MODEL = $docsServer.env.DOCS_MCP_EMBEDDING_MODEL
+
+    $proc = Start-Process -FilePath "C:\Program Files\nodejs\npx.cmd" `
+        -ArgumentList @("-y", "@arabold/docs-mcp-server@latest", "--protocol", "http", "--port", "$DocsPort", "--host", "127.0.0.1") `
+        -WorkingDirectory $ProjectDir `
+        -RedirectStandardOutput $logFile `
+        -RedirectStandardError $errFile `
+        -WindowStyle Hidden `
+        -PassThru
+
+    Set-Content -Path $DocsPidFile -Value "$($proc.Id)"
+    Start-Sleep -Seconds 5
+
+    $portReady = Wait-PortListening -Port $DocsPort -MaxWaitSeconds 120
+    $live = Get-Process -Id $proc.Id -ErrorAction SilentlyContinue
+    if ($null -ne $live -and $portReady) {
+        Write-Ok "Docs MCP Server started (PID: $($proc.Id), port: $DocsPort)"
+    } else {
+        Write-Warn "Docs MCP Server startup check failed (pid/port). Check logs: $logFile and $errFile"
+        throw "Docs MCP Server startup failed"
+    }
+}
+
 function Start-GenericMcpHttpServer {
     param(
         [string]$Name,
@@ -256,6 +296,7 @@ function Show-McpStatus {
     Show-PortStatus -Name "Fast Filesystem MCP" -Port $FastFilesystemPort
     Show-PortStatus -Name "JSON Query MCP" -Port $JsonQueryPort
     Show-PortStatus -Name "MCP Pruner" -Port $PrunerPort
+    Show-PortStatus -Name "Docs MCP Server" -Port $DocsPort
 }
 
 function Get-ProxyProcessByPidFile {
@@ -325,13 +366,14 @@ function Start-McpServers {
     Ensure-Dirs
     Ensure-ProxyRunning
     Write-Info "Starting MCP Windows helpers"
-    Write-Info "Expected ports: compression=$CompressionPort sequential=$SequentialPort fast-filesystem=$FastFilesystemPort json-query=$JsonQueryPort pruner=$PrunerPort"
+    Write-Info "Expected ports: compression=$CompressionPort sequential=$SequentialPort fast-filesystem=$FastFilesystemPort json-query=$JsonQueryPort pruner=$PrunerPort docs=$DocsPort"
 
     Start-GenericMcpHttpServer -Name "Context Compression MCP" -Kind "context-compression" -Port $CompressionPort -PidFile $CompressionPidFile -LogFile (Join-Path $McpLogDir "mcp_compression.log")
     Start-GenericMcpHttpServer -Name "Sequential Thinking MCP" -Kind "sequential-thinking" -Port $SequentialPort -PidFile $SequentialPidFile -LogFile (Join-Path $McpLogDir "mcp_sequential_thinking.log")
     Start-GenericMcpHttpServer -Name "Fast Filesystem MCP" -Kind "fast-filesystem" -Port $FastFilesystemPort -PidFile $FastFilesystemPidFile -LogFile (Join-Path $McpLogDir "mcp_fast_filesystem.log")
     Start-GenericMcpHttpServer -Name "JSON Query MCP" -Kind "json-query" -Port $JsonQueryPort -PidFile $JsonQueryPidFile -LogFile (Join-Path $McpLogDir "mcp_json_query.log")
     Start-Pruner
+    Start-DocsMcpServer
     Show-McpStatus
 
     if (Test-HttpHealth -Url $ProxyHealthUrl -TimeoutSec 2) {
@@ -350,15 +392,15 @@ function Stop-McpServers {
         Write-Info "Stopping MCP Windows helpers"
     }
 
-    foreach ($pidFile in @($CompressionPidFile, $SequentialPidFile, $FastFilesystemPidFile, $JsonQueryPidFile, $PrunerPidFile)) {
+    foreach ($pidFile in @($CompressionPidFile, $SequentialPidFile, $FastFilesystemPidFile, $JsonQueryPidFile, $PrunerPidFile, $DocsPidFile)) {
         Stop-FromPidFile -PidFile $pidFile
     }
 
-    foreach ($port in @($CompressionPort, $SequentialPort, $FastFilesystemPort, $JsonQueryPort, $PrunerPort)) {
+    foreach ($port in @($CompressionPort, $SequentialPort, $FastFilesystemPort, $JsonQueryPort, $PrunerPort, $DocsPort)) {
         Stop-ByPort -Port $port
     }
 
-    foreach ($port in @($CompressionPort, $SequentialPort, $FastFilesystemPort, $JsonQueryPort, $PrunerPort)) {
+    foreach ($port in @($CompressionPort, $SequentialPort, $FastFilesystemPort, $JsonQueryPort, $PrunerPort, $DocsPort)) {
         if (-not (Wait-PortClosed -Port $port -MaxWaitSeconds 8)) {
             Write-Warn "Port $port still listening after stop attempt (possible non-MCP process or delayed release)"
         }

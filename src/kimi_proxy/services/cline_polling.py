@@ -14,11 +14,9 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
-from datetime import datetime
 from typing import Optional, TypedDict
 
-from ..features.cline_importer import ClineImporter, ClineImportResult
-from .websocket_manager import ConnectionManager
+from ..features.cline_importer import ClineImporter
 
 
 class ClineUsageUpdatedMessage(TypedDict):
@@ -45,11 +43,9 @@ class ClinePollingService:
 
     def __init__(
         self,
-        manager: ConnectionManager,
         importer: ClineImporter,
         config: ClinePollingConfig,
     ):
-        self._manager = manager
         self._importer = importer
         self._config = config
 
@@ -88,40 +84,19 @@ class ClinePollingService:
             self._task = None
 
     async def poll_once(self) -> bool:
-        """Exécute un cycle d'import et broadcast si changement détecté.
+        """Exécute un cycle d'import.
 
         Returns:
-            True si un broadcast a été envoyé, False sinon.
+            True si de nouvelles données ont été importées, False sinon.
         """
 
         before_ts = await self._importer.get_latest_ts()
         before_count = await self._importer.get_usage_count()
-        result: ClineImportResult = await self._importer.import_default_ledger()
+        await self._importer.import_default_ledger()
         after_ts = await self._importer.get_latest_ts()
         after_count = await self._importer.get_usage_count()
 
-        # Signal "nouvelle donnée" (best-effort) :
-        # - ts max a changé, OU
-        # - nombre de lignes a changé
-        #
-        # Note: importer.import_default_ledger() upsert en DB, donc after_* reflète
-        # bien l'état DB post-import.
         if after_ts == before_ts and after_count == before_count:
-            return False
-
-        message: ClineUsageUpdatedMessage = {
-            "type": "cline_usage_updated",
-            "latest_ts": after_ts,
-            "latest_count": int(after_count),
-            "imported_count": int(result.get("imported_count", 0)),
-            "timestamp": datetime.now().isoformat(),
-        }
-
-        # Ne jamais laisser le broadcast casser le service.
-        try:
-            await self._manager.broadcast(message)
-        except Exception as e:
-            print(f"⚠️ Erreur broadcast WebSocket (cline): {e}")
             return False
 
         return True
@@ -151,14 +126,12 @@ class ClinePollingService:
 
 
 def create_cline_polling_service(
-    manager: ConnectionManager,
     config: ClinePollingConfig,
     importer: Optional[ClineImporter] = None,
 ) -> ClinePollingService:
     """Factory: crée le service de polling Cline."""
 
     return ClinePollingService(
-        manager=manager,
         importer=importer or ClineImporter(),
         config=config,
     )

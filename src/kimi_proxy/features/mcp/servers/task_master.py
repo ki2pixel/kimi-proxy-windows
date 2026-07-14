@@ -49,7 +49,7 @@ class TaskMasterMCPClient:
         try:
             start_time = datetime.now()
             await self.rpc_client.make_rpc_call(
-                server_url=self.config.task_master_url,
+                server_url=self.config.task_master_url or "",
                 method="get_tasks",
                 params={"limit": 1},
                 timeout_ms=self.config.task_master_timeout_ms,
@@ -60,7 +60,7 @@ class TaskMasterMCPClient:
             self._status = MCPPhase4ServerStatus(
                 name="task-master-mcp",
                 type="task_master",
-                url=self.config.task_master_url,
+                url=self.config.task_master_url or "",
                 connected=True,
                 last_check=datetime.now().isoformat(),
                 latency_ms=latency_ms,
@@ -72,7 +72,7 @@ class TaskMasterMCPClient:
             self._status = MCPPhase4ServerStatus(
                 name="task-master-mcp",
                 type="task_master",
-                url=self.config.task_master_url,
+                url=self.config.task_master_url or "",
                 connected=False,
                 last_check=datetime.now().isoformat(),
                 error_count=1,
@@ -90,7 +90,7 @@ class TaskMasterMCPClient:
             }
 
         result = await self.rpc_client.make_rpc_call(
-            self.config.task_master_url,
+            self.config.task_master_url or "",
             method=tool_name,
             params=params,
             timeout_ms=self.config.task_master_timeout_ms,

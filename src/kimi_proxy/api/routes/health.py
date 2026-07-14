@@ -3,6 +3,8 @@ Routes API pour le health check.
 """
 from fastapi import APIRouter
 
+from typing import Optional
+
 from ...core.database import get_active_session
 from ...config.display import get_max_context_for_session
 from ...config.loader import get_config
@@ -10,7 +12,7 @@ from ...services.rate_limiter import get_rate_limiter
 from ...features.log_watcher import LogWatcher
 
 # Instance globale du log watcher (sera injectée depuis main.py)
-_log_watcher: LogWatcher = None
+_log_watcher: Optional[LogWatcher] = None
 
 router = APIRouter()
 
@@ -36,6 +38,23 @@ async def health_check():
     # Vérifie si le log watcher est actif
     log_watcher_status = "running" if _log_watcher and _log_watcher.running else "stopped"
     log_file_exists = os.path.exists(_log_watcher.log_path) if _log_watcher else False
+    source_states = []
+    source_summary = {
+        "total": 0,
+        "available": 0,
+        "healthy": 0,
+        "source_ids": [],
+        "source_kinds": [],
+    }
+    if _log_watcher:
+        source_states = [state.to_dict() for state in _log_watcher.get_source_states()]
+        source_summary = {
+            "total": len(source_states),
+            "available": sum(1 for state in source_states if state.get("available")),
+            "healthy": sum(1 for state in source_states if state.get("healthy")),
+            "source_ids": [state.get("source_id") for state in source_states],
+            "source_kinds": sorted({state.get("source_kind") for state in source_states if state.get("source_kind")}),
+        }
     
     rate_limiter = get_rate_limiter()
 
@@ -46,7 +65,9 @@ async def health_check():
         "log_watcher": {
             "status": log_watcher_status,
             "log_file_exists": log_file_exists,
-            "log_path": _log_watcher.log_path if _log_watcher else None
+            "log_path": _log_watcher.log_path if _log_watcher else None,
+            "sources": source_states,
+            "summary": source_summary,
         },
         "rate_limit": {
             "current_rpm": rate_limiter.get_current_rpm(),

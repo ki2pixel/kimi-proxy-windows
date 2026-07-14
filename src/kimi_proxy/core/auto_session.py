@@ -7,7 +7,7 @@ différent de la session active et crée une nouvelle session automatiquement.
 from typing import Dict, Any, Optional, Tuple
 from datetime import datetime
 
-from ..core.database import create_session, get_active_session
+from ..core.database import create_session
 from ..config.loader import get_config
 
 
@@ -127,18 +127,6 @@ def auto_create_session(
         
         print(f"🔄 [AUTO SESSION] Nouvelle session créée: #{new_session['id']} "
               f"({detected_provider}/{detected_model})")
-        
-        # Diffuser via WebSocket pour que l'UI recharge
-        from ..services.websocket_manager import get_connection_manager
-        manager = get_connection_manager()
-        if manager:
-            import asyncio
-            asyncio.create_task(manager.broadcast({
-                "type": "auto_session_created",
-                "session": new_session,
-                "provider": detected_provider,
-                "model": detected_model
-            }))
         
         return new_session
         

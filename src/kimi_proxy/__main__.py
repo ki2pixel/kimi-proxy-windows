@@ -1,10 +1,8 @@
 """
 Point d'entrée pour `python -m kimi_proxy`.
 """
-import sys
 import uvicorn
 
-from .main import create_app
 
 
 def main():

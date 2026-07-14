@@ -1,8 +1,9 @@
 """
 Routes API pour le sanitizer (Phase 1).
 """
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, Depends
 from fastapi.responses import JSONResponse
+from ..auth import verify_proxy_secret
 
 from ...features.sanitizer.storage import (
     get_masked_content,
@@ -19,14 +20,33 @@ _sanitizer_enabled = True
 
 @router.get("/mask/{content_hash}")
 async def get_masked_content_endpoint(content_hash: str):
-    """Récupère le contenu masqué par son hash."""
+    """Récupère le contenu masqué par son hash (sans données sensibles)."""
     content = get_masked_content(content_hash)
     if not content:
         return JSONResponse(
             status_code=404,
             content={"error": "Contenu masqué non trouvé", "hash": content_hash}
         )
-    
+
+    return {
+        "hash": content["content_hash"],
+        "preview": content["preview"],
+        "tags": content["tags"].split(",") if content["tags"] else [],
+        "token_count": content["token_count"],
+        "created_at": content["created_at"]
+    }
+
+
+@router.get("/admin/mask/{content_hash}")
+async def get_masked_content_admin(content_hash: str, token: str = Depends(verify_proxy_secret)):
+    """Récupère le contenu masqué avec les données originales pour l'administration."""
+    content = get_masked_content(content_hash)
+    if not content:
+        return JSONResponse(
+            status_code=404,
+            content={"error": "Contenu masqué non trouvé", "hash": content_hash}
+        )
+
     return {
         "hash": content["content_hash"],
         "preview": content["preview"],
@@ -42,7 +62,7 @@ async def get_masked_content_endpoint(content_hash: str):
 async def list_masked_content(limit: int = 50):
     """Liste les contenus masqués récents."""
     items = list_masked_contents(limit)
-    
+
     return {
         "items": items,
         "total": len(items)
@@ -54,7 +74,7 @@ async def get_sanitizer_stats_endpoint():
     """Retourne les statistiques du sanitizer."""
     config = get_sanitizer_config()
     stats = get_sanitizer_stats()
-    
+
     return {
         "enabled": config.get("enabled", True),
         "threshold_tokens": config.get("threshold_tokens", 1000),
@@ -70,9 +90,9 @@ async def toggle_sanitizer(request: Request):
     global _sanitizer_enabled
     data = await request.json()
     enabled = data.get("enabled", True)
-    
+
     _sanitizer_enabled = enabled
-    
+
     return {
         "enabled": enabled,
         "message": f"Sanitizer {'activé' if enabled else 'désactivé'}"
@@ -83,7 +103,7 @@ def get_sanitizer_config():
     """Récupère la configuration du sanitizer."""
     config = get_config()
     sanitizer_config = config.get("sanitizer", {})
-    
+
     return {
         "enabled": sanitizer_config.get("enabled", True),
         "threshold_tokens": sanitizer_config.get("threshold_tokens", 1000),

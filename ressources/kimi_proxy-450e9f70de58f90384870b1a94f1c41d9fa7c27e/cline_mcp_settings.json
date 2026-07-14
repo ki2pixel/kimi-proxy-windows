@@ -1,0 +1,208 @@
+{
+  "mcpServers": {
+    "filesystem-agent": {
+      "timeout": 60,
+      "command": "python3",
+      "args": [
+        "/home/kidpixel/kimi-proxy/scripts/mcp_bridge.py",
+        "filesystem-agent"
+      ],
+      "env": {
+        "PATH": "/usr/bin:/bin:/usr/local/bin",
+        "MCP_BRIDGE_PATH_ENV": "/usr/bin:/bin:/usr/local/bin",
+        "MCP_FILESYSTEM_ALLOWED_ROOT": "/home/kidpixel",
+        "MCP_BRIDGE_MONITORING_ENABLED": "1",
+        "MCP_BRIDGE_MONITORING_LOG_PATH": "/tmp/kimi-proxy/mcp-bridge-filesystem.jsonl",
+        "MCP_BRIDGE_MONITORING_QUEUE_MAX": "1000",
+        "MCP_BRIDGE_MONITORING_SUMMARY_ON_EXIT": "1",
+        "KIMI_MCP_TOOL_PRUNING_ENABLED": "1",
+        "KIMI_MCP_TOOL_PRUNING_MIN_CHARS": "4000",
+        "KIMI_MCP_TOOL_PRUNING_TIMEOUT_MS": "1500",
+        "KIMI_MCP_TOOL_PRUNING_MAX_CHARS_FALLBACK": "0",
+        "KIMI_MCP_PRUNING_GOAL_HINT": "compress tool output",
+        "KIMI_MCP_TOOL_PRUNING_MAX_PRUNE_RATIO": "0.55",
+        "KIMI_MCP_TOOL_PRUNING_MIN_KEEP_LINES": "40",
+        "KIMI_MCP_TOOL_PRUNING_ANNOTATE_LINES": "true",
+        "KIMI_MCP_TOOL_PRUNING_INCLUDE_MARKERS": "true",
+        "KIMI_MCP_PRUNER_RPC_URL": "http://localhost:8006/rpc",
+        "KIMI_MCP_TOOL_PRUNING_METRICS_STDERR": "1",
+        "KIMI_MCP_TOOL_PRUNING_METRICS_STDERR_INTERVAL_S": "10",
+        "KIMI_MCP_TOOL_PRUNING_METRICS_HEALTH": "1"
+      },
+      "type": "stdio",
+      "autoApprove": [
+        "write_file",
+        "read_text_file",
+        "list_directory_with_sizes",
+        "list_allowed_directories",
+        "directory_tree"
+      ]
+    },
+    "ripgrep-agent": {
+      "timeout": 60,
+      "command": "python3",
+      "args": [
+        "/home/kidpixel/kimi-proxy/scripts/mcp_bridge.py",
+        "ripgrep-agent"
+      ],
+      "env": {
+        "PATH": "/usr/bin:/bin:/usr/local/bin",
+        "MCP_BRIDGE_PATH_ENV": "/usr/bin:/bin:/usr/local/bin",
+        "MCP_BRIDGE_STDIO_STREAM_LIMIT": "8388608",
+        "MCP_BRIDGE_MONITORING_ENABLED": "1",
+        "MCP_BRIDGE_MONITORING_LOG_PATH": "/tmp/kimi-proxy/mcp-bridge-ripgrep.jsonl",
+        "MCP_BRIDGE_MONITORING_QUEUE_MAX": "1000",
+        "MCP_BRIDGE_MONITORING_SUMMARY_ON_EXIT": "1",
+        "KIMI_MCP_TOOL_PRUNING_ENABLED": "1",
+        "KIMI_MCP_TOOL_PRUNING_MIN_CHARS": "4000",
+        "KIMI_MCP_TOOL_PRUNING_TIMEOUT_MS": "1500",
+        "KIMI_MCP_TOOL_PRUNING_MAX_CHARS_FALLBACK": "0",
+        "KIMI_MCP_PRUNING_GOAL_HINT": "compress tool output",
+        "KIMI_MCP_TOOL_PRUNING_MAX_PRUNE_RATIO": "0.55",
+        "KIMI_MCP_TOOL_PRUNING_MIN_KEEP_LINES": "40",
+        "KIMI_MCP_TOOL_PRUNING_ANNOTATE_LINES": "true",
+        "KIMI_MCP_TOOL_PRUNING_INCLUDE_MARKERS": "true",
+        "KIMI_MCP_PRUNER_RPC_URL": "http://localhost:8006/rpc",
+        "KIMI_MCP_TOOL_PRUNING_METRICS_STDERR": "1",
+        "KIMI_MCP_TOOL_PRUNING_METRICS_STDERR_INTERVAL_S": "10",
+        "KIMI_MCP_TOOL_PRUNING_METRICS_HEALTH": "1"
+      },
+      "type": "stdio",
+      "autoApprove": [
+        "advanced-search",
+        "search"
+      ]
+    },
+    "shrimp-task-manager": {
+      "timeout": 60,
+      "command": "python3",
+      "args": [
+        "/home/kidpixel/kimi-proxy/scripts/mcp_bridge.py",
+        "shrimp-task-manager"
+      ],
+      "env": {
+        "PATH": "/usr/bin:/bin:/usr/local/bin",
+        "MCP_BRIDGE_PATH_ENV": "/usr/bin:/bin:/usr/local/bin",
+        "MCP_SHRIMP_TASK_MANAGER_COMMAND": "/home/kidpixel/.local/bin/shrimp-task-manager",
+        "DATA_DIR": "/home/kidpixel/kimi-proxy/shrimp_data",
+        "MCP_BRIDGE_MONITORING_ENABLED": "1",
+        "MCP_BRIDGE_MONITORING_LOG_PATH": "/tmp/kimi-proxy/mcp-bridge-shrimp.jsonl",
+        "MCP_BRIDGE_MONITORING_QUEUE_MAX": "1000",
+        "MCP_BRIDGE_MONITORING_SUMMARY_ON_EXIT": "1",
+        "KIMI_MCP_TOOL_PRUNING_ENABLED": "1",
+        "KIMI_MCP_TOOL_PRUNING_MIN_CHARS": "4000",
+        "KIMI_MCP_TOOL_PRUNING_TIMEOUT_MS": "1500",
+        "KIMI_MCP_TOOL_PRUNING_MAX_CHARS_FALLBACK": "0",
+        "KIMI_MCP_PRUNING_GOAL_HINT": "compress tool output",
+        "KIMI_MCP_TOOL_PRUNING_MAX_PRUNE_RATIO": "0.55",
+        "KIMI_MCP_TOOL_PRUNING_MIN_KEEP_LINES": "40",
+        "KIMI_MCP_TOOL_PRUNING_ANNOTATE_LINES": "true",
+        "KIMI_MCP_TOOL_PRUNING_INCLUDE_MARKERS": "true",
+        "KIMI_MCP_PRUNER_RPC_URL": "http://localhost:8006/rpc",
+        "KIMI_MCP_TOOL_PRUNING_METRICS_STDERR": "1",
+        "KIMI_MCP_TOOL_PRUNING_METRICS_STDERR_INTERVAL_S": "10",
+        "KIMI_MCP_TOOL_PRUNING_METRICS_HEALTH": "1"
+      },
+      "type": "stdio",
+      "autoApprove": [
+        "list_tasks",
+        "analyze_task",
+        "reflect_task",
+        "split_tasks",
+        "execute_task",
+        "get_task_detail",
+        "verify_task",
+        "update_task",
+        "plan_task"
+      ]
+    },
+    "sequential-thinking": {
+      "timeout": 60,
+      "url": "http://localhost:8000/api/mcp-gateway/sequential-thinking/rpc",
+      "headers": {},
+      "type": "streamableHttp",
+      "autoApprove": [
+        "sequentialthinking_tools"
+      ]
+    },
+    "fast-filesystem": {
+      "timeout": 60,
+      "url": "http://localhost:8000/api/mcp-gateway/fast-filesystem/rpc",
+      "headers": {},
+      "type": "streamableHttp",
+      "autoApprove": [
+        "fast_write_file",
+        "fast_read_file",
+        "fast_read_multiple_files",
+        "fast_get_directory_tree"
+      ]
+    },
+    "json-query": {
+      "timeout": 60,
+      "url": "http://localhost:8000/api/mcp-gateway/json-query/rpc",
+      "headers": {},
+      "type": "streamableHttp",
+      "autoApprove": [
+        "json_query_search_values"
+      ]
+    },
+    "redis-signal-mcp-server": {
+      "timeout": 60,
+      "command": "uvx",
+      "args": [
+        "--from",
+        "redis-mcp-server@latest",
+        "redis-mcp-server",
+        "--url",
+        "redis://hidden"
+      ],
+      "type": "stdio"
+    },
+    "photomaton-postgres": {
+      "timeout": 60,
+      "command": "uvx",
+      "args": [
+        "--python",
+        "3.12",
+        "postgres-mcp",
+        "--access-mode=unrestricted"
+      ],
+      "env": {
+        "DATABASE_URI": "postgresql://hidden"
+      },
+      "type": "stdio"
+    },
+    "switchbot-postgres": {
+      "timeout": 60,
+      "command": "uvx",
+      "args": [
+        "--python",
+        "3.12",
+        "postgres-mcp",
+        "--access-mode=unrestricted"
+      ],
+      "env": {
+        "DATABASE_URI": "postgresql://hidden"
+      },
+      "type": "stdio"
+    },
+    "docs-mcp-server": {
+      "type": "streamableHttp",
+      "url": "http://localhost:6280/mcp",
+      "env": {
+        "GOOGLE_API_KEY": "hidden",
+        "DOCS_MCP_EMBEDDING_MODEL": "gemini:embedding-001"
+      }
+    },
+    "mcp-pruner": {
+      "timeout": 60,
+      "url": "http://localhost:8006/rpc",
+      "headers": {},
+      "type": "streamableHttp",
+      "autoApprove": [
+        "prune_text",
+        "recover_text"
+      ]
+    }
+  }
+}

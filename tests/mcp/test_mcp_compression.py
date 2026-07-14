@@ -8,9 +8,10 @@ Vérifie :
 - Calcul de ratio et qualité
 """
 import pytest
-import pytest_asyncio
-from unittest.mock import Mock, AsyncMock, patch, call
+from unittest.mock import Mock, AsyncMock, patch
 from datetime import datetime
+import base64
+import zlib
 
 from kimi_proxy.features.mcp.servers.compression import CompressionMCPClient
 from kimi_proxy.features.mcp.base.config import MCPClientConfig
