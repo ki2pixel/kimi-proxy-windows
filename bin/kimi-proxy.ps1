@@ -113,7 +113,7 @@ function Ensure-Venv {
 }
 
 function Start-Proxy {
-    param([string]$BindHost = "0.0.0.0", [int]$Port = 8000, [switch]$Reload)
+    param([string]$BindHost = "127.0.0.1", [int]$Port = 8000, [switch]$Reload)
 
     $existing = Get-ServerProcess
     if ($null -ne $existing) {
@@ -214,7 +214,7 @@ $command = if ($args.Count -gt 0) { $args[0] } else { "help" }
 
 switch ($command) {
     "start" {
-        $bindHost = "0.0.0.0"
+        $bindHost = "127.0.0.1"
         $port = 8000
         $reload = $false
         for ($i = 1; $i -lt $args.Count; $i++) {

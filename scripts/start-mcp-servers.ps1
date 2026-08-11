@@ -177,30 +177,55 @@ function Start-DocsMcpServer {
 
     $logFile = Join-Path $McpLogDir "docs_mcp_server.log"
     $errFile = Join-Path $McpLogDir "docs_mcp_server.err.log"
-    $clineConfigPath = "C:\Users\kidpixel\.cline\data\settings\cline_mcp_settings.json"
-    $clineConfig = Get-Content $clineConfigPath | ConvertFrom-Json
-    $docsServer = $clineConfig.mcpServers."docs-mcp-server"
-    $env:GOOGLE_API_KEY = $docsServer.env.GOOGLE_API_KEY
-    $env:DOCS_MCP_EMBEDDING_MODEL = $docsServer.env.DOCS_MCP_EMBEDDING_MODEL
+    $clineConfigPath = Join-Path $env:USERPROFILE ".cline\data\settings\cline_mcp_settings.json"
+    if (-not (Test-Path $clineConfigPath)) {
+        $clineConfigPath = Join-Path $ProjectDir "cline_mcp_settings.json"
+    }
 
-    $proc = Start-Process -FilePath "C:\Program Files\nodejs\npx.cmd" `
-        -ArgumentList @("-y", "@arabold/docs-mcp-server@latest", "--protocol", "http", "--port", "$DocsPort", "--host", "127.0.0.1") `
-        -WorkingDirectory $ProjectDir `
-        -RedirectStandardOutput $logFile `
-        -RedirectStandardError $errFile `
-        -WindowStyle Hidden `
-        -PassThru
+    if (-not (Test-Path $clineConfigPath)) {
+        Write-Warn "Docs MCP Server skipped (missing configuration)"
+        return
+    }
 
-    Set-Content -Path $DocsPidFile -Value "$($proc.Id)"
-    Start-Sleep -Seconds 5
+    $npxCmd = Get-Command "npx" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -ErrorAction SilentlyContinue
+    if (-not $npxCmd) {
+        $candidateNpx = "C:\Program Files\nodejs\npx.cmd"
+        if (Test-Path $candidateNpx) { $npxCmd = $candidateNpx }
+    }
 
-    $portReady = Wait-PortListening -Port $DocsPort -MaxWaitSeconds 120
-    $live = Get-Process -Id $proc.Id -ErrorAction SilentlyContinue
-    if ($null -ne $live -and $portReady) {
-        Write-Ok "Docs MCP Server started (PID: $($proc.Id), port: $DocsPort)"
-    } else {
-        Write-Warn "Docs MCP Server startup check failed (pid/port). Check logs: $logFile and $errFile"
-        throw "Docs MCP Server startup failed"
+    if (-not $npxCmd) {
+        Write-Warn "Docs MCP Server skipped (npx not installed)"
+        return
+    }
+
+    try {
+        $clineConfig = Get-Content $clineConfigPath | ConvertFrom-Json
+        $docsServer = $clineConfig.mcpServers."docs-mcp-server"
+        if ($docsServer -and $docsServer.env) {
+            if ($docsServer.env.GOOGLE_API_KEY) { $env:GOOGLE_API_KEY = $docsServer.env.GOOGLE_API_KEY }
+            if ($docsServer.env.DOCS_MCP_EMBEDDING_MODEL) { $env:DOCS_MCP_EMBEDDING_MODEL = $docsServer.env.DOCS_MCP_EMBEDDING_MODEL }
+        }
+
+        $proc = Start-Process -FilePath $npxCmd `
+            -ArgumentList @("-y", "@arabold/docs-mcp-server@latest", "--protocol", "http", "--port", "$DocsPort", "--host", "127.0.0.1") `
+            -WorkingDirectory $ProjectDir `
+            -RedirectStandardOutput $logFile `
+            -RedirectStandardError $errFile `
+            -WindowStyle Hidden `
+            -PassThru
+
+        Set-Content -Path $DocsPidFile -Value "$($proc.Id)"
+        Start-Sleep -Seconds 3
+
+        $portReady = Wait-PortListening -Port $DocsPort -MaxWaitSeconds 15
+        $live = Get-Process -Id $proc.Id -ErrorAction SilentlyContinue
+        if ($null -ne $live -and $portReady) {
+            Write-Ok "Docs MCP Server started (PID: $($proc.Id), port: $DocsPort)"
+        } else {
+            Write-Warn "Docs MCP Server startup check failed. Check logs: $logFile"
+        }
+    } catch {
+        Write-Warn "Docs MCP Server skipped: $_"
     }
 }
 
@@ -334,7 +359,7 @@ function Ensure-ProxyRunning {
         $env:PYTHONUTF8 = "1"
 
         $proxyProc = Start-Process -FilePath $VenvPython `
-            -ArgumentList @("-m", "uvicorn", "kimi_proxy.main:app", "--host", "0.0.0.0", "--port", "8000") `
+            -ArgumentList @("-m", "uvicorn", "kimi_proxy.main:app", "--host", "127.0.0.1", "--port", "8000") `
             -WorkingDirectory $ProjectDir `
             -RedirectStandardOutput $ProxyLogFile `
             -RedirectStandardError $ProxyErrLogFile `
